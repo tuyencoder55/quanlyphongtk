@@ -1,0 +1,332 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 224 71% 6%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 71% 6%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 210 100% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 47% 11%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 216 12% 84%;
+
+    --radius: 0.5rem;
+  }
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Tùy chỉnh thanh cuộn cho bảng chấm công rộng */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ============================================================
+   CẤU HÌNH IN ẤN CHUẨN KHỔ A4 LANDSCAPE (NGANG) THEO BIỂU MẪU GỐC
+   ============================================================ */
+@media print {
+  @page {
+    margin: 5mm 5mm;
+  }
+
+  /* Reset toàn bộ môi trường trang về trắng tuyệt đối và hủy bỏ overflow-hidden */
+  html, body, #root, #root > div, .min-h-screen, .h-screen, main, [class*="overflow-"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Ẩn hoàn toàn sidebar, header, nút bấm, popover khi in */
+  aside, header, nav, .no-print, button, select, input, [role="tooltip"] {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: #ffffff !important;
+  }
+
+  /* Vùng in ấn: Tắt shadow, viền bo tròn, scroll container */
+  .print-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* VÔ HIỆU HÓA STICKY NHƯNG KHÔNG ĐỔI DISPLAY CỦA TABLE */
+  .print-area * {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* BẢNG CHẤM CÔNG CỐ ĐỊNH CHIỀU RỘNG CHUẨN A4 - KHÔNG BAO GIỜ TRÀN CỘT */
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important; /* BẮT BUỘC ĐỂ KHÔNG BỊ TRÀN HAY MẤT CỘT */
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    font-size: 6pt !important;
+    line-height: 1.1 !important;
+    background: #ffffff !important;
+  }
+
+  /* MỌI Ô TRONG BẢNG BẮT BUỘC LÀ TABLE-CELL ĐỂ BẢO VỆ ROWSPAN VÀ COLSPAN */
+  th, td {
+    display: table-cell !important;
+    border: 0.5pt solid #000000 !important;
+    color: #000000 !important;
+    padding: 1px 0 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    background-color: #ffffff !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  /* Chiều rộng cố định cho từng cột theo tỷ lệ % hoàn hảo trong khổ A4 */
+  th.col-stt, td.col-stt {
+    width: 3% !important;
+  }
+  th.col-code, td.col-code {
+    width: 6% !important;
+  }
+  th.col-name, td.col-name {
+    width: 12% !important;
+  }
+  th.col-type, td.col-type {
+    width: 4% !important;
+  }
+  th.col-total-w, td.col-total-w {
+    width: 5.5% !important;
+  }
+  th.col-total-s, td.col-total-s {
+    width: 4.5% !important;
+  }
+  /* Các cột ngày chia đều 65% chiều rộng còn lại */
+  th.col-day, td.col-day {
+    width: auto !important;
+  }
+
+  /* Header bảng: Nền xám rất nhạt hoặc trắng, chữ đen đậm */
+  thead th {
+    background-color: #f8fafc !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+  }
+
+  /* Cột Chủ Nhật (CN): Xám bạc sáng khi in đen trắng, dịu mắt không bị đen xì */
+  th.print-sunday-hdr {
+    background-color: #e2e8f0 !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+  }
+  td.print-sunday-cell {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+  }
+
+  /* Nhãn hàng: 上班 (Đi làm) và 加班 (Tăng ca) */
+  .print-row-work {
+    background-color: #dcfce7 !important; /* Xanh lá nhạt */
+    color: #14532d !important;
+    font-weight: 700 !important;
+  }
+  .print-row-ot {
+    background-color: #fef9c3 !important; /* Vàng nhạt */
+    color: #713f12 !important;
+    font-weight: 700 !important;
+  }
+
+  /* 2 Cột Tổng bên phải */
+  th.print-total-weekday-hdr {
+    background-color: #fce7f3 !important;
+    color: #831843 !important;
+    font-weight: 700 !important;
+  }
+  td.print-total-weekday-cell {
+    background-color: #fdf2f8 !important;
+    color: #831843 !important;
+    font-weight: 700 !important;
+    font-size: 6.5pt !important;
+  }
+  th.print-total-sunday-hdr {
+    background-color: #e0f2fe !important;
+    color: #0369a1 !important;
+    font-weight: 700 !important;
+  }
+  td.print-total-sunday-cell {
+    background-color: #f0f9ff !important;
+    color: #0369a1 !important;
+    font-weight: 700 !important;
+    font-size: 6.5pt !important;
+  }
+
+  /* Giá trị số công 8h hoặc giờ tăng ca: Đen đậm, rõ nét */
+  .print-cell-value {
+    color: #000000 !important;
+    font-weight: 700 !important;
+    font-size: 6.5pt !important;
+  }
+
+  /* Badge Phép năm PN: Nền đỏ, chữ trắng đậm */
+  .print-badge-pn {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 5.5pt !important;
+    line-height: 12px !important;
+    padding: 0 1px !important;
+    border-radius: 1px !important;
+    display: inline-block !important;
+  }
+
+  /* Badge Phép thường PT: Nền vàng, chữ đen đậm */
+  .print-badge-pt {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    font-size: 5.5pt !important;
+    line-height: 12px !important;
+    padding: 0 1px !important;
+    border-radius: 1px !important;
+    display: inline-block !important;
+  }
+
+  /* Badge Không phép KP: Nền xám, chữ đen */
+  .print-badge-kp {
+    background-color: #cbd5e1 !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    font-size: 5.5pt !important;
+    line-height: 12px !important;
+    padding: 0 1px !important;
+    border-radius: 1px !important;
+    display: inline-block !important;
+  }
+
+  /* Cột thông tin nhân viên: chữ đen rõ ràng */
+  .print-emp-code {
+    font-family: Arial, monospace !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
+    font-size: 6.5pt !important;
+  }
+  .print-emp-name {
+    font-weight: 700 !important;
+    color: #000000 !important;
+    font-size: 6.5pt !important;
+  }
+  .print-emp-zh {
+    color: #334155 !important;
+    font-size: 5.5pt !important;
+    font-weight: 600 !important;
+  }
+
+  /* ============================================================
+     HỖ TRỢ IN BIỂU MẪU ĐỀ NGHỊ TĂNG CA (A4 DỌC) & IN HÀNG LOẠT
+     ============================================================ */
+  .overtime-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    font-size: 8pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .overtime-sheet table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  .overtime-sheet th,
+  .overtime-sheet td {
+    border: 0.5pt solid #000000 !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    padding: 1px 2px !important;
+    font-size: 7.5pt !important;
+    line-height: 1.15 !important;
+    height: 17px !important;
+  }
+
+  /* Ngắt trang khi in hàng loạt nhiều nhân viên */
+  .page-break-after-always {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+}
+
