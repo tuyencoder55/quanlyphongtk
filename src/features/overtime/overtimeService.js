@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 
 // Khóa lưu cấu hình chi tiết ca (giờ vào/ra tùy biến nếu có) trong localStorage
 const OVERTIME_DETAIL_KEY = 'quanlyphongtk_ot_details'
@@ -167,37 +167,40 @@ export async function saveOvertimeEntry({
   endTime,
   reason = 'Xử lý file / 处理档案'
 }) {
+  const dayNum = Number(day)
+  const hoursNum = Number(hours)
+
   // 1. Kiểm tra xem ô ngày này trong timesheet_entries đã có chưa
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('timesheet_entries')
     .select('id')
     .eq('period_id', periodId)
     .eq('employee_id', employeeId)
     .eq('row_type', 'overtime')
-    .eq('day', day)
+    .eq('day', dayNum)
     .maybeSingle()
 
   let entryId = existing?.id
 
   if (entryId) {
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('timesheet_entries')
       .update({
-        value_hours: hours,
+        value_hours: hoursNum,
         updated_at: new Date().toISOString()
       })
       .eq('id', entryId)
 
     if (error) throw error
   } else {
-    const { data: inserted, error } = await supabase
+    const { data: inserted, error } = await supabaseAdmin
       .from('timesheet_entries')
       .insert({
         period_id: periodId,
         employee_id: employeeId,
         row_type: 'overtime',
-        day,
-        value_hours: hours,
+        day: dayNum,
+        value_hours: hoursNum,
       })
       .select()
       .single()
@@ -207,12 +210,12 @@ export async function saveOvertimeEntry({
   }
 
   // 2. Lưu chi tiết giờ vào/ra và lý do
-  const storageKey = `${periodId}_${employeeId}_${day}`
+  const storageKey = `${periodId}_${employeeId}_${dayNum}`
   saveDetailToStorage(storageKey, {
     startTime,
     endTime,
     reason,
-    hours,
+    hours: hoursNum,
   })
 
   return { id: entryId, success: true }
@@ -222,7 +225,9 @@ export async function saveOvertimeEntry({
  * Xoá một ca tăng ca (đặt value_hours về 0)
  */
 export async function deleteOvertimeEntry(periodId, employeeId, day) {
-  const { error } = await supabase
+  const dayNum = Number(day)
+
+  const { data, error } = await supabaseAdmin
     .from('timesheet_entries')
     .update({
       value_hours: 0,
@@ -231,14 +236,15 @@ export async function deleteOvertimeEntry(periodId, employeeId, day) {
     .eq('period_id', periodId)
     .eq('employee_id', employeeId)
     .eq('row_type', 'overtime')
-    .eq('day', day)
+    .eq('day', dayNum)
+    .select()
 
   if (error) throw error
 
-  const storageKey = `${periodId}_${employeeId}_${day}`
+  const storageKey = `${periodId}_${employeeId}_${dayNum}`
   removeDetailFromStorage(storageKey)
 
-  return { success: true }
+  return { success: true, data }
 }
 
 /**

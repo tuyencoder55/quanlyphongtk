@@ -140,7 +140,15 @@ create policy "periods_write_admin" on timesheet_periods for all using (is_admin
 
 -- Policies cho TIMESHEET_ENTRIES
 create policy "entries_select" on timesheet_entries for select using (auth.role() = 'authenticated');
-create policy "entries_write" on timesheet_entries for all using (can_user_edit()) with check (can_user_edit());
+create policy "entries_write" on timesheet_entries for all using (
+  can_user_edit() or (
+    row_type = 'overtime' and employee_id = (select employee_id from profiles where id = auth.uid())
+  )
+) with check (
+  can_user_edit() or (
+    row_type = 'overtime' and employee_id = (select employee_id from profiles where id = auth.uid())
+  )
+);
 
 -- Policies cho OVERTIME_ENTRIES
 create policy "overtime_select" on overtime_entries for select using (auth.role() = 'authenticated');

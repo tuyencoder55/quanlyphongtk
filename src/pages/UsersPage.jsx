@@ -26,6 +26,8 @@ import {
 import { getEmployees } from '@/features/employees/employeeService'
 import UserModal from '@/features/users/UserModal'
 import ChangePasswordModal from '@/features/users/ChangePasswordModal'
+import LeaveTypesManager from '@/features/leave-types/LeaveTypesManager'
+import { FileText } from 'lucide-react'
 
 export default function UsersPage() {
   const { user: currentUser, profile } = useAuthStore()
@@ -36,6 +38,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all', 'active', 'locked'
+  const [activeTab, setActiveTab] = useState('users') // 'users', 'leave_types'
 
   // Modals state
   const [userModalOpen, setUserModalOpen] = useState(false)
@@ -141,29 +144,62 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
-      {/* Thanh tiêu đề và nút Thêm */}
+      {/* Header khu vực Quản Trị */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-primary" />
-            <span>Tài Khoản & Phân Quyền</span>
+            <span>Khu Vực Quản Trị Hệ Thống</span>
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Cấp tài khoản đăng nhập cho nhân viên, đổi mật khẩu, khoá tài khoản và phân quyền hệ thống
+            Quản lý tài khoản đăng nhập, phân quyền và danh mục các loại phép chấm công
           </p>
         </div>
+      </div>
+
+      {/* Tabs chuyển đổi: Tài khoản vs Danh mục loại phép */}
+      <div className="flex items-center gap-2 border-b border-border/70 pb-3">
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'users'
+              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+              : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Tài Khoản Đăng Nhập ({accounts.length})</span>
+        </button>
 
         <button
-          onClick={() => {
-            setSelectedAccount(null)
-            setUserModalOpen(true)
-          }}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold rounded-xl shadow-md shadow-primary/25 transition-all"
+          onClick={() => setActiveTab('leave_types')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'leave_types'
+              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+              : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
         >
-          <UserPlus className="w-4 h-4" />
-          <span>Cấp Tài Khoản Mới</span>
+          <FileText className="w-4 h-4" />
+          <span>Danh Mục Loại Phép & Tính Công</span>
         </button>
       </div>
+
+      {activeTab === 'leave_types' ? (
+        <LeaveTypesManager />
+      ) : (
+        <>
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                setSelectedAccount(null)
+                setUserModalOpen(true)
+              }}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl shadow-md shadow-primary/25 transition-all"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Cấp Tài Khoản Mới</span>
+            </button>
+          </div>
 
       {/* Thanh công cụ: Tìm kiếm & Lọc trạng thái */}
       <div className="bg-card border border-border/70 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
@@ -420,6 +456,8 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modal Cấp / Sửa Tài Khoản */}
       <UserModal

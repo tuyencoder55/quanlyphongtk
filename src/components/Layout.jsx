@@ -59,15 +59,15 @@ export default function Layout({ children }) {
       path: '/overtime',
       icon: Clock,
     },
-    {
-      name: 'Quản Lý Nhân Viên',
-      path: '/employees',
-      icon: Users,
-    },
     ...(isAdmin ? [
       {
+        name: 'Quản Lý Nhân Viên',
+        path: '/employees',
+        icon: Users,
+      },
+      {
         name: 'Tài Khoản & Phân Quyền',
-        path: '/users',
+        path: '/admin',
         icon: ShieldCheck,
       }
     ] : []),

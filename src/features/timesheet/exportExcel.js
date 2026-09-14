@@ -3,11 +3,17 @@ import * as XLSX from 'xlsx'
 /**
  * Xuất dữ liệu bảng chấm công sang file Excel (.xlsx) đúng định dạng và thiết lập khổ A4 Landscape
  */
-export function exportTimesheetToExcel({ period, days, employees, entries }) {
+export function exportTimesheetToExcel({ period, days, employees, entries, leaveTypes = [] }) {
   // 1. Tạo Map truy vấn ô: `${empId}_${rowType}_${day}` -> entry
   const entryMap = new Map()
   entries.forEach((e) => {
     entryMap.set(`${e.employee_id}_${e.row_type}_${e.day}`, e)
+  })
+
+  // Map tra cứu loại phép
+  const leaveTypeMap = new Map()
+  leaveTypes.forEach((lt) => {
+    leaveTypeMap.set(lt.code, lt)
   })
 
   // 2. Chuẩn bị ma trận dữ liệu (aoa - array of arrays)
@@ -88,8 +94,11 @@ export function exportTimesheetToExcel({ period, days, employees, entries }) {
       const leaveCode = entry?.leave_code
       const leaveHours = Number(entry?.leave_hours || 0)
 
-      const paidPnHours = leaveCode === 'PN' ? leaveHours : 0
-      const totalDayWork = hours + paidPnHours
+      // Quy tắc tính công: tra cứu theo loại phép động
+      const targetLeaveType = leaveCode ? leaveTypeMap.get(leaveCode) : null
+      const isPaid = targetLeaveType ? targetLeaveType.is_paid : (leaveCode === 'PN')
+      const paidLeaveHours = isPaid ? leaveHours : 0
+      const totalDayWork = hours + paidLeaveHours
 
       if (d.isSunday) {
         workSunday += hours
@@ -97,9 +106,9 @@ export function exportTimesheetToExcel({ period, days, employees, entries }) {
         workWeekday += totalDayWork
       }
 
-      if (leaveCode === 'PN') return hours > 0 ? `${hours}/PN${leaveHours}` : 'PN'
-      if (leaveCode === 'PT') return hours > 0 ? `${hours}/PT${leaveHours}` : 'PT'
-      if (leaveCode === 'KP') return 'KP'
+      if (leaveCode) {
+        return hours > 0 ? `${hours}/${leaveCode}${leaveHours}` : leaveCode
+      }
       return hours > 0 ? hours : ''
     })
 

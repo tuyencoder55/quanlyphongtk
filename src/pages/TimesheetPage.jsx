@@ -10,6 +10,8 @@ import {
 } from '@/features/timesheet/timesheetService'
 import TimesheetGrid from '@/features/timesheet/TimesheetGrid'
 import { exportTimesheetToExcel } from '@/features/timesheet/exportExcel'
+import { getLeaveTypes } from '@/features/leave-types/leaveTypeService'
+import LeaveTypesConfigModal from '@/features/leave-types/LeaveTypesConfigModal'
 import { 
   CalendarDays, 
   PlusCircle, 
@@ -23,7 +25,8 @@ import {
   Printer,
   FileSpreadsheet,
   Download,
-  Wand2
+  Wand2,
+  SlidersHorizontal
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -39,16 +42,29 @@ export default function TimesheetPage() {
   const [period, setPeriod] = useState(null)
   const [employees, setEmployees] = useState([])
   const [entries, setEntries] = useState([])
+  const [leaveTypes, setLeaveTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [showLeaveConfigModal, setShowLeaveConfigModal] = useState(false)
 
   // Danh sách ngày trong tháng đang chọn
   const days = getDaysForMonth(selectedYear, selectedMonth)
+
+  // Tải danh mục loại phép động
+  const loadLeaveTypes = useCallback(async () => {
+    try {
+      const types = await getLeaveTypes()
+      setLeaveTypes(types || [])
+    } catch (err) {
+      console.warn('Lỗi tải danh mục loại phép:', err)
+    }
+  }, [])
 
   // Tải dữ liệu kỳ hiện tại
   const loadPeriod = useCallback(async () => {
     setLoading(true)
     try {
+      loadLeaveTypes()
       const p = await getTimesheetPeriod(selectedMonth, selectedYear)
       setPeriod(p)
 
@@ -65,7 +81,7 @@ export default function TimesheetPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedMonth, selectedYear])
+  }, [selectedMonth, selectedYear, loadLeaveTypes])
 
   useEffect(() => {
     loadPeriod()
@@ -210,7 +226,7 @@ export default function TimesheetPage() {
       return
     }
     try {
-      exportTimesheetToExcel({ period, days, employees, entries })
+      exportTimesheetToExcel({ period, days, employees, entries, leaveTypes })
       toast.success(`Đã xuất file Excel tháng ${selectedMonth}/${selectedYear} thành công!`)
     } catch (err) {
       toast.error('Lỗi khi xuất file Excel: ' + err.message)
@@ -359,6 +375,18 @@ export default function TimesheetPage() {
                   <span>Điền 8h Ngày Thường</span>
                 </button>
               )}
+
+              {/* Nút Cấu hình Loại Phép (chỉ Admin / người có quyền) */}
+              {canEdit && (
+                <button
+                  onClick={() => setShowLeaveConfigModal(true)}
+                  title="Thêm loại phép mới hoặc cấu hình quy tắc tính 8h công"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all shadow-sm"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-rose-400" />
+                  <span>Cấu Hình Loại Phép</span>
+                </button>
+              )}
             </>
           ) : (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
@@ -402,8 +430,10 @@ export default function TimesheetPage() {
           days={days}
           employees={employees}
           entries={entries}
+          leaveTypes={leaveTypes}
           canEdit={canEdit}
           onSaveCell={handleSaveCell}
+          onOpenLeaveConfig={() => setShowLeaveConfigModal(true)}
         />
       ) : (
         /* Màn hình khi chưa tạo kỳ */
@@ -441,6 +471,15 @@ export default function TimesheetPage() {
           )}
         </div>
       )}
+
+      {/* Modal Cấu Hình Danh Mục Loại Phép Ngay Trên Trang Chấm Công */}
+      <LeaveTypesConfigModal
+        isOpen={showLeaveConfigModal}
+        onClose={() => {
+          setShowLeaveConfigModal(false)
+          loadLeaveTypes()
+        }}
+      />
     </div>
   )
 }

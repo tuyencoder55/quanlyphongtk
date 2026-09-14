@@ -6,8 +6,10 @@ export default function TimesheetGrid({
   days, 
   employees, 
   entries, 
+  leaveTypes = [],
   canEdit, 
-  onSaveCell 
+  onSaveCell,
+  onOpenLeaveConfig
 }) {
   // Tạo map nhanh để truy vấn ô: `${employee_id}_${row_type}_${day}` -> entry
   const entryMap = useMemo(() => {
@@ -18,6 +20,15 @@ export default function TimesheetGrid({
     })
     return map
   }, [entries])
+
+  // Tạo map nhanh để tra cứu thuộc tính loại phép (is_paid, color, ...)
+  const leaveTypeMap = useMemo(() => {
+    const map = new Map()
+    leaveTypes.forEach((lt) => {
+      map.set(lt.code, lt)
+    })
+    return map
+  }, [leaveTypes])
 
   // Tính toán tổng cột cho từng nhân viên
   const employeeTotals = useMemo(() => {
@@ -36,9 +47,12 @@ export default function TimesheetGrid({
         const leaveCode = workEntry?.leave_code
         const leaveHours = Number(workEntry?.leave_hours || 0)
 
-        // Quy tắc: Phép năm (PN) ngày thường được cộng vào tổng công
-        const paidPnHours = leaveCode === 'PN' ? leaveHours : 0
-        const totalDayWork = workHours + paidPnHours
+        // Quy tắc tính công: tra cứu theo danh mục loại phép động
+        // Nếu loại phép có is_paid === true thì tính giờ phép vào tổng ngày thường
+        const targetLeaveType = leaveCode ? leaveTypeMap.get(leaveCode) : null
+        const isPaid = targetLeaveType ? targetLeaveType.is_paid : (leaveCode === 'PN')
+        const paidLeaveHours = isPaid ? leaveHours : 0
+        const totalDayWork = workHours + paidLeaveHours
 
         if (d.isSunday) {
           workSunday += workHours
@@ -66,7 +80,7 @@ export default function TimesheetGrid({
     })
 
     return totals
-  }, [employees, days, entryMap])
+  }, [employees, days, entryMap, leaveTypeMap])
 
   return (
     <div className="print-area w-full bg-card border border-border/80 rounded-2xl shadow-xl overflow-hidden flex flex-col">
@@ -97,20 +111,21 @@ export default function TimesheetGrid({
           </span>
         </div>
 
-        {/* Chú thích màu mã nghỉ */}
+        {/* Chú thích màu mã nghỉ động */}
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-rose-600 text-white flex items-center justify-center text-[9px] font-bold">
-              PN
-            </span>
-            <span className="text-muted-foreground text-[11px]">Phép năm (hưởng lương)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-amber-400 text-slate-950 flex items-center justify-center text-[9px] font-bold">
-              PT
-            </span>
-            <span className="text-muted-foreground text-[11px]">Phép thường</span>
-          </div>
+          {leaveTypes.map((lt) => (
+            <div key={lt.code} className="flex items-center gap-1.5">
+              <span 
+                className="w-auto min-w-[22px] px-1 h-4 rounded text-white flex items-center justify-center text-[9px] font-bold shadow-sm"
+                style={{ backgroundColor: lt.color || '#e11d48' }}
+              >
+                {lt.code}
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                {lt.name} {lt.is_paid ? '(tính 8h công)' : '(không công)'}
+              </span>
+            </div>
+          ))}
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-sky-500/20 border border-sky-500/40" />
             <span className="text-muted-foreground text-[11px]">Chủ Nhật (CN)</span>
@@ -290,8 +305,10 @@ export default function TimesheetGrid({
                               rowType="work"
                               day={d.day}
                               isSunday={d.isSunday}
+                              leaveTypes={leaveTypes}
                               canEdit={canEdit}
                               onSave={onSaveCell}
+                              onOpenLeaveConfig={onOpenLeaveConfig}
                             />
                           </td>
                         )
@@ -330,8 +347,10 @@ export default function TimesheetGrid({
                               rowType="overtime"
                               day={d.day}
                               isSunday={d.isSunday}
+                              leaveTypes={leaveTypes}
                               canEdit={canEdit}
                               onSave={onSaveCell}
+                              onOpenLeaveConfig={onOpenLeaveConfig}
                             />
                           </td>
                         )

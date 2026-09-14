@@ -31,6 +31,31 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// Component bảo vệ Route dành riêng cho Quản trị viên (Admin)
+function AdminRoute({ children }) {
+  const { user, profile, loading } = useAuthStore()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="text-sm">Đang tải thông tin tài khoản...</span>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Nếu không phải admin thì chuyển hướng về trang chủ
+  if (profile?.role !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
 export default function App() {
   const { initAuth } = useAuthStore()
 
@@ -87,23 +112,27 @@ export default function App() {
         <Route
           path="/employees"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Layout>
                 <EmployeesPage />
               </Layout>
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
+        {/* Route dành riêng cho Admin: Quản lý tài khoản & phân quyền */}
         <Route
-          path="/users"
+          path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Layout>
                 <UsersPage />
               </Layout>
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
+
+        {/* Tự động chuyển hướng /users cũ về /admin */}
+        <Route path="/users" element={<Navigate to="/admin" replace />} />
 
         {/* Chuyển hướng các đường dẫn khác về trang chủ */}
         <Route path="*" element={<Navigate to="/" replace />} />
