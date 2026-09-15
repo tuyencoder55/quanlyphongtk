@@ -7,6 +7,7 @@ export default function TimesheetGrid({
   employees, 
   entries, 
   leaveTypes = [],
+  department = { code: 'TK', nameVi: 'THIẾT KẾ', nameZh: '设计部', label: 'Phòng Thiết Kế' },
   canEdit, 
   onSaveCell,
   onOpenLeaveConfig
@@ -88,7 +89,7 @@ export default function TimesheetGrid({
       <div className="hidden print:block mb-1 text-black">
         <div className="flex items-end justify-between border-b pb-1 border-black">
           <div className="text-[9pt] font-bold uppercase tracking-tight">
-            BỘ PHẬN: <span className="underline">THIẾT KẾ</span>
+            BỘ PHẬN: <span className="underline">{department?.nameVi || 'THIẾT KẾ'}</span> ({department?.nameZh || '设计部'})
           </div>
           <div className="text-[12pt] font-extrabold uppercase tracking-wider text-center flex-1">
             BẢNG CHẤM CÔNG THÁNG {String(period.month).padStart(2, '0')}/{period.year}
@@ -103,7 +104,8 @@ export default function TimesheetGrid({
       <div className="print:hidden p-4 border-b border-border/70 bg-secondary/30 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="font-bold text-sm text-foreground">
-            BỘ PHẬN: <span className="text-primary font-extrabold tracking-wide">THIẾT KẾ</span>
+            BỘ PHẬN: <span className="text-primary font-extrabold tracking-wide">{department?.nameVi || 'THIẾT KẾ'}</span>
+            <span className="text-muted-foreground text-xs ml-1 font-normal">({department?.nameZh || '设计部'})</span>
           </span>
           <span className="text-xs text-muted-foreground">|</span>
           <span className="text-xs text-muted-foreground font-medium">
@@ -234,7 +236,7 @@ export default function TimesheetGrid({
             {employees.length === 0 ? (
               <tr>
                 <td colSpan={days.length + 6} className="py-12 text-center text-muted-foreground">
-                  Chưa có nhân viên nào trong kỳ chấm công này. Vui lòng vào mục Quản Lý Nhân Viên để thêm nhân sự.
+                  Chưa có nhân viên nào thuộc {department?.label || 'bộ phận này'} trong kỳ chấm công. Vui lòng vào mục Quản Lý Nhân Viên để phân loại hoặc thêm nhân sự.
                 </td>
               </tr>
             ) : (

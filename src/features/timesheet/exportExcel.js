@@ -3,7 +3,14 @@ import * as XLSX from 'xlsx'
 /**
  * Xuất dữ liệu bảng chấm công sang file Excel (.xlsx) đúng định dạng và thiết lập khổ A4 Landscape
  */
-export function exportTimesheetToExcel({ period, days, employees, entries, leaveTypes = [] }) {
+export function exportTimesheetToExcel({ 
+  period, 
+  days, 
+  employees, 
+  entries, 
+  leaveTypes = [],
+  department = { code: 'TK', nameVi: 'THIẾT KẾ', nameZh: '设计部', label: 'Phòng Thiết Kế' }
+}) {
   // 1. Tạo Map truy vấn ô: `${empId}_${rowType}_${day}` -> entry
   const entryMap = new Map()
   entries.forEach((e) => {
@@ -20,8 +27,10 @@ export function exportTimesheetToExcel({ period, days, employees, entries, leave
   const aoa = []
 
   // Dòng 1: Tiêu đề lớn
+  const deptTitleVi = department?.nameVi || 'THIẾT KẾ'
+  const deptTitleZh = department?.nameZh || '设计部'
   aoa.push([
-    `BỘ PHẬN: THIẾT KẾ (设计部)`,
+    `BỘ PHẬN: ${deptTitleVi} (${deptTitleZh})`,
     ...Array(3).fill(''),
     `BIỂU CHẤM CÔNG THÁNG ${String(period.month).padStart(2, '0')}/${period.year}`,
   ])
@@ -193,9 +202,11 @@ export function exportTimesheetToExcel({ period, days, employees, entries, leave
   }
 
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, `Tháng ${period.month}-${period.year}`)
+  const deptCode = department?.code || 'TK'
+  const sheetName = `${deptCode}_Tháng ${period.month}-${period.year}`
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
 
   // Xuất file
-  const fileName = `Bang_Cham_Cong_Thang_${String(period.month).padStart(2, '0')}_${period.year}.xlsx`
+  const fileName = `Bang_Cham_Cong_${deptCode}_Thang_${String(period.month).padStart(2, '0')}_${period.year}.xlsx`
   XLSX.writeFile(wb, fileName)
 }

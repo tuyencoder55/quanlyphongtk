@@ -114,9 +114,9 @@ export async function createTimesheetPeriod(month, year, createdBy) {
 }
 
 /**
- * Tải toàn bộ dữ liệu chấm công của 1 kỳ (kèm thông tin nhân viên)
+ * Tải toàn bộ dữ liệu chấm công của 1 kỳ (kèm thông tin nhân viên, có thể lọc theo bộ phận)
  */
-export async function getPeriodData(periodId) {
+export async function getPeriodData(periodId, department = null) {
   // Lấy toàn bộ entries của kỳ
   const { data: entries, error: entriesError } = await supabase
     .from('timesheet_entries')
@@ -133,17 +133,31 @@ export async function getPeriodData(periodId) {
 
   if (empError) throw empError
 
+  // Đảm bảo mọi nhân viên luôn có department (fallback 'TK')
+  const mappedEmployees = (allEmployees || []).map((emp) => ({
+    ...emp,
+    department: emp.department || 'TK',
+  }))
+
   // Tập hợp danh sách employee_id có trong entries
   const employeeIdsInPeriod = new Set(entries.map((e) => e.employee_id))
   
   // Những nhân viên active HOẶC đã có dữ liệu trong kỳ này sẽ được hiển thị
-  const relevantEmployees = allEmployees.filter(
+  let relevantEmployees = mappedEmployees.filter(
     (emp) => emp.status === 'active' || employeeIdsInPeriod.has(emp.id)
   )
+
+  // Lọc theo bộ phận nếu được chỉ định
+  if (department) {
+    relevantEmployees = relevantEmployees.filter(
+      (emp) => emp.department === department
+    )
+  }
 
   return {
     entries: entries || [],
     employees: relevantEmployees || [],
+    allEmployees: mappedEmployees,
   }
 }
 

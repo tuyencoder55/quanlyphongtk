@@ -24,7 +24,8 @@ export function exportOvertimeToExcel({ period, employee, entries = [], reason =
   aoa.push(['Kính gửi/敬致:'])
   aoa.push(['- Ban Giám đốc Công ty TNHH BAO BÌ LẬP THỊNH 立盛包装责任有限公司董事会'])
   aoa.push(['- Phòng Hành chính Nhân sự 人事部'])
-  aoa.push(['- Phòng bộ phận/部门 : Thiết kế 设计部'])
+  const deptTitle = (employee?.department === 'CTP') ? 'CTP CTP部' : 'Thiết kế 设计部'
+  aoa.push([`- Phòng bộ phận/部门 : ${deptTitle}`])
   aoa.push([`Kỳ tăng ca/日期 : Tháng/月 ${String(period?.month).padStart(2, '0')} Năm/年 ${period?.year}`])
   aoa.push([`Lý do tăng ca/加班理由: ${reason}`])
   aoa.push(['Đề nghị Công ty chấp thuận cho chúng tôi được tăng ca: 建议公司允许我们加班'])

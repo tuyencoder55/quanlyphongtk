@@ -40,6 +40,7 @@ export default function OvertimePage() {
 
   const [period, setPeriod] = useState(null)
   const [employees, setEmployees] = useState([])
+  const [deptFilter, setDeptFilter] = useState('ALL') // 'ALL' | 'TK' | 'CTP'
   const [selectedEmpId, setSelectedEmpId] = useState('')
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -110,10 +111,25 @@ export default function OvertimePage() {
     loadEmployeeEntries()
   }, [loadEmployeeEntries])
 
+  // Danh sách nhân viên sau khi lọc theo bộ phận
+  const filteredEmployees = useMemo(() => {
+    if (deptFilter === 'ALL') return employees
+    return employees.filter((e) => (e.department || 'TK') === deptFilter)
+  }, [employees, deptFilter])
+
+  // Xử lý đổi bộ phận lọc
+  const handleDeptFilterChange = (dept) => {
+    setDeptFilter(dept)
+    const list = dept === 'ALL' ? employees : employees.filter((e) => (e.department || 'TK') === dept)
+    if (list.length > 0 && !list.some((e) => e.id === selectedEmpId)) {
+      setSelectedEmpId(list[0].id)
+    }
+  }
+
   // Nhân viên đang chọn
   const currentEmployee = useMemo(() => {
-    return employees.find((e) => e.id === selectedEmpId) || employees[0] || null
-  }, [employees, selectedEmpId])
+    return filteredEmployees.find((e) => e.id === selectedEmpId) || filteredEmployees[0] || null
+  }, [filteredEmployees, selectedEmpId])
 
   // Chuyển tháng
   const handlePrevMonth = () => {
@@ -248,7 +264,8 @@ export default function OvertimePage() {
     setLoading(true)
     try {
       const map = new Map()
-      for (const emp of employees) {
+      const listToPrint = filteredEmployees.length > 0 ? filteredEmployees : employees
+      for (const emp of listToPrint) {
         const empEntries = await getEmployeeOvertimeEntries(
           period.id,
           emp.id,
@@ -365,6 +382,45 @@ export default function OvertimePage() {
             </button>
           </div>
 
+          {/* Bộ lọc bộ phận (Admin) */}
+          {isAdmin && (
+            <div className="flex items-center bg-secondary/80 p-0.5 rounded-xl border border-border/60 shrink-0 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => handleDeptFilterChange('ALL')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  deptFilter === 'ALL'
+                    ? 'bg-card text-foreground shadow-sm font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeptFilterChange('TK')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  deptFilter === 'TK'
+                    ? 'bg-blue-600 text-white shadow-sm font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Thiết Kế
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeptFilterChange('CTP')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  deptFilter === 'CTP'
+                    ? 'bg-amber-600 text-white shadow-sm font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                CTP
+              </button>
+            </div>
+          )}
+
           {/* Chọn Nhân viên (Admin có thể chọn bất kỳ ai, Member hiển thị tên mình) */}
           <div className="flex items-center gap-2 bg-secondary/80 hover:bg-secondary/95 px-3 py-1.5 rounded-xl border border-border/70 shadow-sm transition-all shrink-0">
             <div className="w-5 h-5 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
@@ -378,9 +434,9 @@ export default function OvertimePage() {
                   onChange={(e) => setSelectedEmpId(e.target.value)}
                   className="bg-transparent font-bold text-xs sm:text-sm text-foreground pr-5 outline-none cursor-pointer appearance-none shrink-0"
                 >
-                  {employees.map((emp) => (
+                  {filteredEmployees.map((emp) => (
                     <option key={emp.id} value={emp.id} className="bg-card text-foreground font-medium py-1">
-                      {emp.employee_code} — {emp.full_name}
+                      [{emp.department === 'CTP' ? 'CTP' : 'TK'}] {emp.employee_code} — {emp.full_name}
                     </option>
                   ))}
                 </select>
@@ -388,7 +444,16 @@ export default function OvertimePage() {
               </div>
             ) : (
               <span className="font-bold text-xs sm:text-sm text-foreground shrink-0">
-                {currentEmployee ? `${currentEmployee.employee_code} — ${currentEmployee.full_name}` : 'Chưa liên kết'}
+                {currentEmployee ? `[${currentEmployee.department === 'CTP' ? 'CTP' : 'TK'}] ${currentEmployee.employee_code} — ${currentEmployee.full_name}` : 'Chưa liên kết'}
+              </span>
+            )}
+            {currentEmployee && (
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide ${
+                currentEmployee.department === 'CTP'
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+              }`}>
+                {currentEmployee.department === 'CTP' ? 'CTP' : 'Thiết Kế'}
               </span>
             )}
           </div>
@@ -500,7 +565,7 @@ export default function OvertimePage() {
           {/* Chế độ in hàng loạt (Render tất cả nhân viên có ngắt trang) */}
           {isBulkPrinting ? (
             <div className="space-y-8">
-              {employees.map((emp) => {
+              {(filteredEmployees.length > 0 ? filteredEmployees : employees).map((emp) => {
                 const empEntries = allEmployeesEntries.get(emp.id) || []
                 return (
                   <OvertimeSheet

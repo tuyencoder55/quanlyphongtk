@@ -32,6 +32,7 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all', 'active', 'inactive'
+  const [departmentFilter, setDepartmentFilter] = useState('all') // 'all', 'TK', 'CTP'
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
@@ -86,7 +87,7 @@ export default function EmployeesPage() {
     }
   }
 
-  // Lọc dữ liệu theo từ khoá và trạng thái
+  // Lọc dữ liệu theo từ khoá, trạng thái và bộ phận
   const filteredEmployees = employees.filter((emp) => {
     const matchesSearch = 
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,7 +97,11 @@ export default function EmployeesPage() {
     const matchesStatus = 
       statusFilter === 'all' || emp.status === statusFilter
 
-    return matchesSearch && matchesStatus
+    const empDept = emp.department || 'TK'
+    const matchesDept = 
+      departmentFilter === 'all' || empDept === departmentFilter
+
+    return matchesSearch && matchesStatus && matchesDept
   })
 
   return (
@@ -179,6 +184,42 @@ export default function EmployeesPage() {
         </div>
       </div>
 
+      {/* Tabs Lọc Theo Bộ Phận (Thiết Kế / CTP) */}
+      <div className="flex items-center gap-2 border-b border-border/60 pb-1">
+        <button
+          onClick={() => setDepartmentFilter('all')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            departmentFilter === 'all'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
+        >
+          Tất Cả ({employees.length})
+        </button>
+        <button
+          onClick={() => setDepartmentFilter('TK')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            departmentFilter === 'TK'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
+        >
+          <span>🎨 Phòng Thiết Kế</span>
+          <span className="text-[11px] opacity-80">({employees.filter(e => (e.department || 'TK') === 'TK').length})</span>
+        </button>
+        <button
+          onClick={() => setDepartmentFilter('CTP')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            departmentFilter === 'CTP'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
+        >
+          <span>🖨️ Bộ Phận CTP</span>
+          <span className="text-[11px] opacity-80">({employees.filter(e => e.department === 'CTP').length})</span>
+        </button>
+      </div>
+
       {/* Bảng Danh Sách Nhân Viên */}
       <div className="bg-card border border-border/70 rounded-xl overflow-hidden shadow-sm">
         {loading ? (
@@ -195,7 +236,7 @@ export default function EmployeesPage() {
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
               {searchTerm 
                 ? 'Không có kết quả khớp với từ khoá tìm kiếm của bạn.' 
-                : 'Chưa có nhân viên nào trong hệ thống. Hãy bấm nút Thêm Nhân Viên Mới để bắt đầu.'}
+                : 'Chưa có nhân viên nào trong danh sách. Hãy bấm nút Thêm Nhân Viên Mới để bắt đầu.'}
             </p>
             {canEdit && !searchTerm && (
               <button
@@ -214,16 +255,17 @@ export default function EmployeesPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border/70 bg-secondary/40 text-muted-foreground font-semibold">
-                  <th className="py-3 px-4 w-16 text-center">STT</th>
+                  <th className="py-3 px-4 w-14 text-center">STT</th>
                   <th className="py-3 px-4 w-28">MÃ SỐ</th>
-                  <th className="py-3 px-6">HỌ VÀ TÊN (VIỆT - TRUNG)</th>
+                  <th className="py-3 px-5">HỌ VÀ TÊN (VIỆT - TRUNG)</th>
+                  <th className="py-3 px-4 w-32 text-center">BỘ PHẬN</th>
                   {isAdmin && (
-                    <th className="py-3 px-4 w-44 text-center">TÀI KHOẢN ĐĂNG NHẬP</th>
+                    <th className="py-3 px-4 w-40 text-center">TÀI KHOẢN ĐĂNG NHẬP</th>
                   )}
-                  <th className="py-3 px-4 w-32 text-center">TRẠNG THÁI</th>
-                  <th className="py-3 px-4 w-32 text-right">NGÀY TẠO</th>
+                  <th className="py-3 px-4 w-28 text-center">TRẠNG THÁI</th>
+                  <th className="py-3 px-4 w-28 text-right">NGÀY TẠO</th>
                   {(canEdit || canDelete) && (
-                    <th className="py-3 px-4 w-28 text-center">THAO TÁC</th>
+                    <th className="py-3 px-4 w-24 text-center">THAO TÁC</th>
                   )}
                 </tr>
               </thead>
@@ -252,7 +294,7 @@ export default function EmployeesPage() {
                       </td>
 
                       {/* Họ và tên: Tiếng Việt trên, Chữ Hán dưới */}
-                      <td className="py-3.5 px-6">
+                      <td className="py-3.5 px-5">
                         <div className="flex flex-col">
                           <span className="font-bold text-foreground text-sm tracking-wide">
                             {emp.full_name}
@@ -267,6 +309,19 @@ export default function EmployeesPage() {
                             </span>
                           )}
                         </div>
+                      </td>
+
+                      {/* Bộ phận */}
+                      <td className="py-3.5 px-4 text-center">
+                        {(emp.department || 'TK') === 'CTP' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                            <span>🖨️ CTP</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                            <span>🎨 Thiết Kế</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Cột Tài khoản (chỉ Admin thấy) */}

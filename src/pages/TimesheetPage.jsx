@@ -38,6 +38,7 @@ export default function TimesheetPage() {
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const [activeDepartment, setActiveDepartment] = useState('TK') // 'TK' hoặc 'CTP'
 
   const [period, setPeriod] = useState(null)
   const [employees, setEmployees] = useState([])
@@ -49,6 +50,16 @@ export default function TimesheetPage() {
 
   // Danh sách ngày trong tháng đang chọn
   const days = getDaysForMonth(selectedYear, selectedMonth)
+
+  // Thông tin cấu hình bộ phận đang chọn
+  const departmentInfo = activeDepartment === 'CTP'
+    ? { code: 'CTP', nameVi: 'CTP', nameZh: 'CTP部', label: 'Bộ Phận CTP' }
+    : { code: 'TK', nameVi: 'THIẾT KẾ', nameZh: '设计部', label: 'Phòng Thiết Kế' }
+
+  // Danh sách nhân viên thuộc bộ phận đang chọn
+  const displayedEmployees = employees.filter(
+    (emp) => (emp.department || 'TK') === activeDepartment
+  )
 
   // Tải danh mục loại phép động
   const loadLeaveTypes = useCallback(async () => {
@@ -69,9 +80,9 @@ export default function TimesheetPage() {
       setPeriod(p)
 
       if (p) {
-        const { entries: ent, employees: emp } = await getPeriodData(p.id)
+        const { entries: ent, employees: emp, allEmployees: allEmp } = await getPeriodData(p.id)
         setEntries(ent)
-        setEmployees(emp)
+        setEmployees(allEmp || emp)
       } else {
         setEntries([])
         setEmployees([])
@@ -219,24 +230,31 @@ export default function TimesheetPage() {
     }, 100)
   }
 
-  // Xuất file Excel chuẩn A4 Landscape
+  // Xuất file Excel chuẩn A4 Landscape theo bộ phận đang chọn
   const handleExportExcel = () => {
-    if (!period || employees.length === 0) {
-      toast.error('Chưa có dữ liệu để xuất Excel!')
+    if (!period || displayedEmployees.length === 0) {
+      toast.error(`Chưa có dữ liệu nhân viên ${departmentInfo.label} để xuất Excel!`)
       return
     }
     try {
-      exportTimesheetToExcel({ period, days, employees, entries, leaveTypes })
-      toast.success(`Đã xuất file Excel tháng ${selectedMonth}/${selectedYear} thành công!`)
+      exportTimesheetToExcel({ 
+        period, 
+        days, 
+        employees: displayedEmployees, 
+        entries, 
+        leaveTypes,
+        department: departmentInfo
+      })
+      toast.success(`Đã xuất file Excel ${departmentInfo.label} tháng ${selectedMonth}/${selectedYear} thành công!`)
     } catch (err) {
       toast.error('Lỗi khi xuất file Excel: ' + err.message)
     }
   }
 
-  // Điền nhanh mặc định 8h cho toàn bộ ngày thường của nhân viên
+  // Điền nhanh mặc định 8h cho toàn bộ ngày thường của nhân viên thuộc bộ phận đang chọn
   const handleFillDefault8h = async () => {
-    if (!period || employees.length === 0) return
-    if (!window.confirm('Bạn có muốn đặt mặc định 8h làm việc cho toàn bộ ngày thường (không tính Chủ Nhật) trong tháng này không?')) {
+    if (!period || displayedEmployees.length === 0) return
+    if (!window.confirm(`Bạn có muốn đặt mặc định 8h làm việc cho toàn bộ ngày thường của ${departmentInfo.label} trong tháng này không?`)) {
       return
     }
 
@@ -244,7 +262,7 @@ export default function TimesheetPage() {
       const updates = []
       days.forEach((d) => {
         if (!d.isSunday) {
-          employees.forEach((emp) => {
+          displayedEmployees.forEach((emp) => {
             const existing = entries.find(
               (e) => e.employee_id === emp.id && e.row_type === 'work' && e.day === d.day
             )
@@ -266,7 +284,7 @@ export default function TimesheetPage() {
       })
 
       if (updates.length === 0) {
-        toast('Tất cả các ô ngày thường đều đã có dữ liệu công!')
+        toast(`Tất cả các ô ngày thường của ${departmentInfo.label} đều đã có dữ liệu công!`)
         return
       }
 
@@ -274,7 +292,7 @@ export default function TimesheetPage() {
         await updateTimesheetCell(item)
       }
 
-      toast.success(`Đã điền mặc định 8h cho ${updates.length} ô ngày thường!`)
+      toast.success(`Đã điền mặc định 8h cho ${updates.length} ô của ${departmentInfo.label}!`)
       loadPeriod()
     } catch (err) {
       toast.error('Lỗi: ' + err.message)
@@ -361,18 +379,18 @@ export default function TimesheetPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all shadow-sm"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                <span>Xuất Excel (.xlsx)</span>
+                <span>Xuất Excel ({departmentInfo.code})</span>
               </button>
 
               {/* Nút Điền 8h ngày thường (chỉ Admin/người có quyền) */}
               {canEdit && (
                 <button
                   onClick={handleFillDefault8h}
-                  title="Tự động điền 8h cho toàn bộ ngày thường của nhân viên"
+                  title={`Tự động điền 8h cho toàn bộ ngày thường của ${departmentInfo.label}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-border/40 transition-all"
                 >
                   <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Điền 8h Ngày Thường</span>
+                  <span>Điền 8h ({departmentInfo.code})</span>
                 </button>
               )}
 
@@ -418,6 +436,43 @@ export default function TimesheetPage() {
         </div>
       </div>
 
+      {/* THANH TAB CHUYỂN ĐỔI BỘ PHẬN (PHƯƠNG ÁN B) - ẨN KHI IN */}
+      <div className="no-print flex flex-wrap items-center gap-2.5">
+        <button
+          onClick={() => setActiveDepartment('TK')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+            activeDepartment === 'TK'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-400/40'
+              : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/70'
+          }`}
+        >
+          <span className="text-base">🎨</span>
+          <div className="text-left">
+            <div>Phòng Thiết Kế (设计部)</div>
+            <div className="text-[10px] font-normal opacity-80">
+              {employees.filter(e => (e.department || 'TK') === 'TK').length} nhân sự
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveDepartment('CTP')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+            activeDepartment === 'CTP'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 ring-2 ring-purple-400/40'
+              : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/70'
+          }`}
+        >
+          <span className="text-base">🖨️</span>
+          <div className="text-left">
+            <div>Bộ Phận CTP (CTP部)</div>
+            <div className="text-[10px] font-normal opacity-80">
+              {employees.filter(e => e.department === 'CTP').length} nhân sự
+            </div>
+          </div>
+        </button>
+      </div>
+
       {/* VÙNG HIỂN THỊ BẢNG HOẶC TRẠNG THÁI CHỜ */}
       {loading ? (
         <div className="bg-card border border-border/70 rounded-2xl p-16 flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -428,9 +483,10 @@ export default function TimesheetPage() {
         <TimesheetGrid
           period={period}
           days={days}
-          employees={employees}
+          employees={displayedEmployees}
           entries={entries}
           leaveTypes={leaveTypes}
+          department={departmentInfo}
           canEdit={canEdit}
           onSaveCell={handleSaveCell}
           onOpenLeaveConfig={() => setShowLeaveConfigModal(true)}

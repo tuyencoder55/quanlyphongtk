@@ -63,7 +63,7 @@ export default function OvertimeSheet({
           - <span className="font-semibold">Phòng Hành chính Nhân sự</span> <span className="text-slate-600">/ 人事部</span>
         </div>
         <div className="pl-3">
-          - <span className="font-semibold">Phòng bộ phận / 部门:</span> <span className="font-bold text-blue-900">Thiết kế / 设计部</span>
+          - <span className="font-semibold">Phòng bộ phận / 部门:</span> <span className="font-bold text-blue-900">{employee?.department === 'CTP' ? 'CTP / CTP部' : 'Thiết kế / 设计部'}</span>
         </div>
         <div className="pl-3 flex flex-wrap gap-4">
           <div>

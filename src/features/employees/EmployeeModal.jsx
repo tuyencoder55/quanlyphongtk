@@ -9,6 +9,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSuccess }) 
   const [employeeCode, setEmployeeCode] = useState('')
   const [fullName, setFullName] = useState('')
   const [chineseName, setChineseName] = useState('')
+  const [department, setDepartment] = useState('TK')
   const [status, setStatus] = useState('active')
   const [submitting, setSubmitting] = useState(false)
 
@@ -17,11 +18,13 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSuccess }) 
       setEmployeeCode(employee.employee_code || '')
       setFullName(employee.full_name || '')
       setChineseName(employee.chinese_name || '')
+      setDepartment(employee.department || 'TK')
       setStatus(employee.status || 'active')
     } else {
       setEmployeeCode('')
       setFullName('')
       setChineseName('')
+      setDepartment('TK')
       setStatus('active')
     }
   }, [employee, isOpen])
@@ -42,6 +45,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSuccess }) 
           employee_code: employeeCode,
           full_name: fullName,
           chinese_name: chineseName,
+          department,
           status,
         })
         toast.success('Cập nhật thông tin nhân viên thành công!')
@@ -50,6 +54,7 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSuccess }) 
           employee_code: employeeCode,
           full_name: fullName,
           chinese_name: chineseName,
+          department,
         })
         toast.success('Thêm nhân viên mới thành công!')
       }
@@ -140,6 +145,47 @@ export default function EmployeeModal({ isOpen, onClose, employee, onSuccess }) 
                 placeholder="陈好花"
                 className="w-full pl-10 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
               />
+            </div>
+          </div>
+
+          {/* Lựa chọn Bộ phận */}
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center justify-between">
+              <span>Bộ Phận Làm Việc *</span>
+              <span className="text-[10px] text-muted-foreground font-normal">Phân loại theo bảng chấm công</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDepartment('TK')}
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                  department === 'TK'
+                    ? 'bg-blue-500/15 border-blue-500/60 text-blue-300 font-bold shadow-sm'
+                    : 'bg-secondary/40 border-border/60 text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <span className="text-base">🎨</span>
+                <div>
+                  <div className="text-xs font-bold">Phòng Thiết Kế</div>
+                  <div className="text-[10px] opacity-75">Mã: TK (设计部)</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDepartment('CTP')}
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                  department === 'CTP'
+                    ? 'bg-purple-500/15 border-purple-500/60 text-purple-300 font-bold shadow-sm'
+                    : 'bg-secondary/40 border-border/60 text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <span className="text-base">🖨️</span>
+                <div>
+                  <div className="text-xs font-bold">Bộ Phận CTP</div>
+                  <div className="text-[10px] opacity-75">Mã: CTP (CTP部)</div>
+                </div>
+              </button>
             </div>
           </div>
 

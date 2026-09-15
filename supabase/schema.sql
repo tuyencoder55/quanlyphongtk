@@ -35,12 +35,13 @@ create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- 2. BẢNG EMPLOYEES (Nhân viên phòng thiết kế)
+-- 2. BẢNG EMPLOYEES (Nhân viên các bộ phận: TK - Thiết Kế, CTP)
 create table if not exists employees (
   id uuid primary key default gen_random_uuid(),
   employee_code text not null unique,   -- Mã số (vd: GH412)
   full_name text not null,               -- Họ tên tiếng Việt (vd: TRẦN HẢO HOA)
   chinese_name text,                     -- Tên chữ Hán (vd: 陈好花)
+  department text not null default 'TK', -- Bộ phận (vd: 'TK', 'CTP')
   status text not null default 'active' check (status in ('active','inactive')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -11,30 +11,44 @@ export async function getEmployees() {
     .order('created_at', { ascending: true })
 
   if (error) throw error
-  return data || []
+  return (data || []).map((emp) => ({
+    ...emp,
+    department: emp.department || 'TK',
+  }))
 }
 
 /**
  * Thêm nhân viên mới + tự động sinh ô chấm công nếu có kỳ tháng hiện tại đang mở
  */
-export async function createEmployee({ employee_code, full_name, chinese_name }) {
+export async function createEmployee({ employee_code, full_name, chinese_name, department = 'TK' }) {
   const code = employee_code.trim().toUpperCase()
   const name = full_name.trim()
   const zhName = chinese_name?.trim() || null
+  const dept = department || 'TK'
 
   // 1. Thêm vào bảng employees
-  const { data: newEmployee, error: insertError } = await supabase
+  const payload = {
+    employee_code: code,
+    full_name: name,
+    chinese_name: zhName,
+    department: dept,
+    status: 'active',
+  }
+
+  let { data: newEmployee, error: insertError } = await supabase
     .from('employees')
-    .insert([
-      {
-        employee_code: code,
-        full_name: name,
-        chinese_name: zhName,
-        status: 'active',
-      },
-    ])
+    .insert([payload])
     .select()
     .single()
+
+  // Fallback nếu DB chưa chạy câu lệnh thêm cột department
+  if (insertError && (insertError.message?.includes('department') || insertError.code === 'PGRST204')) {
+    delete payload.department
+    const retry = await supabase.from('employees').insert([payload]).select().single()
+    if (retry.error) throw retry.error
+    newEmployee = { ...retry.data, department: dept }
+    insertError = null
+  }
 
   if (insertError) {
     if (insertError.code === '23505') {
@@ -102,7 +116,7 @@ export async function createEmployee({ employee_code, full_name, chinese_name })
 /**
  * Cập nhật thông tin nhân viên
  */
-export async function updateEmployee(id, { employee_code, full_name, chinese_name, status }) {
+export async function updateEmployee(id, { employee_code, full_name, chinese_name, department, status }) {
   const updates = {
     employee_code: employee_code.trim().toUpperCase(),
     full_name: full_name.trim(),
@@ -110,16 +124,29 @@ export async function updateEmployee(id, { employee_code, full_name, chinese_nam
     updated_at: new Date().toISOString(),
   }
 
+  if (department) {
+    updates.department = department
+  }
+
   if (status) {
     updates.status = status
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('employees')
     .update(updates)
     .eq('id', id)
     .select()
     .single()
+
+  // Fallback nếu DB chưa có cột department
+  if (error && (error.message?.includes('department') || error.code === 'PGRST204')) {
+    delete updates.department
+    const retry = await supabase.from('employees').update(updates).eq('id', id).select().single()
+    if (retry.error) throw retry.error
+    data = { ...retry.data, department: department || 'TK' }
+    error = null
+  }
 
   if (error) {
     if (error.code === '23505') {
