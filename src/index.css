@@ -172,6 +172,7 @@ body {
   /* Các cột ngày chia đều 65% chiều rộng còn lại */
   th.col-day, td.col-day {
     width: auto !important;
+    padding: 0 !important;
   }
 
   /* Header bảng: Nền xám rất nhạt hoặc trắng, chữ đen đậm */
@@ -235,40 +236,50 @@ body {
     font-size: 6.5pt !important;
   }
 
-  /* Badge Phép năm PN: Nền đỏ, chữ trắng đậm */
-  .print-badge-pn {
-    background-color: #dc2626 !important;
-    color: #ffffff !important;
+  /* ============================================================
+     BADGE MÃ PHÉP KHI IN: TINH GỌN, VỪA VẶN, KHÔNG TRÀN Ô
+     ============================================================ */
+  .print-leave-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 12.5px !important;
+    max-width: 90% !important;
+    min-width: 14px !important;
+    margin: 0 auto !important;
+    padding: 0 1.5px !important;
+    border-radius: 1.5px !important;
+    box-shadow: none !important;
+    line-height: 1 !important;
     font-weight: 700 !important;
-    font-size: 5.5pt !important;
-    line-height: 12px !important;
-    padding: 0 1px !important;
-    border-radius: 1px !important;
-    display: inline-block !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Badge Phép thường PT: Nền vàng, chữ đen đậm */
-  .print-badge-pt {
-    background-color: #facc15 !important;
-    color: #000000 !important;
-    font-weight: 700 !important;
-    font-size: 5.5pt !important;
-    line-height: 12px !important;
-    padding: 0 1px !important;
-    border-radius: 1px !important;
-    display: inline-block !important;
+  /* Cỡ chữ cho mã 1-2 ký tự (PN, PT, KP...) */
+  .print-leave-badge.len-1-2 {
+    font-size: 5.2pt !important;
+    letter-spacing: 0 !important;
+    padding: 0 2px !important;
   }
 
-  /* Badge Không phép KP: Nền xám, chữ đen */
-  .print-badge-kp {
-    background-color: #cbd5e1 !important;
-    color: #000000 !important;
-    font-weight: 700 !important;
-    font-size: 5.5pt !important;
-    line-height: 12px !important;
+  /* Cỡ chữ cho mã 3-4 ký tự (TANG, 4/PN4...) */
+  .print-leave-badge.len-3-4 {
+    font-size: 4.2pt !important;
+    letter-spacing: -0.25px !important;
     padding: 0 1px !important;
-    border-radius: 1px !important;
-    display: inline-block !important;
+  }
+
+  /* Cỡ chữ cho mã dài 5+ ký tự (PB_KO, 4/TANG4...) */
+  .print-leave-badge.len-5-plus {
+    font-size: 3.4pt !important;
+    letter-spacing: -0.35px !important;
+    max-width: 95% !important;
+    padding: 0 0.5px !important;
   }
 
   /* Cột thông tin nhân viên: chữ đen rõ ràng */

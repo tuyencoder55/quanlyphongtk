@@ -96,6 +96,16 @@ export default function TimesheetCell({
     setIsOpen(false)
   }
 
+// Hàm tính màu chữ tương phản chuẩn W3C (nền sáng chữ đen, nền tối chữ trắng)
+function getContrastTextColor(hexColor) {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length < 7) return '#ffffff'
+  const r = parseInt(hexColor.slice(1, 3), 16) || 0
+  const g = parseInt(hexColor.slice(3, 5), 16) || 0
+  const b = parseInt(hexColor.slice(5, 7), 16) || 0
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000
+  return yiq >= 160 ? '#000000' : '#ffffff'
+}
+
   // Render hiển thị nội dung ô
   const renderCellContent = () => {
     if (rowType === 'work') {
@@ -107,20 +117,39 @@ export default function TimesheetCell({
           leaveCode === 'KP' ? '#475569' : '#0284c7'
         )
 
+        // Tính màu chữ tương phản (nền sáng chữ đen, nền tối chữ trắng)
+        const textColor = getContrastTextColor(badgeColor)
+
         if (valueHours > 0 && leaveHours > 0) {
+          const comboText = `${valueHours}/${leaveCode}${leaveHours}`
+          const lenClass = comboText.length <= 4 ? 'len-3-4' : 'len-5-plus'
+
           return (
             <span 
-              className="inline-flex items-center justify-center text-[10px] font-bold px-1 py-0.5 rounded text-white leading-none shadow-sm"
-              style={{ backgroundColor: badgeColor }}
+              className={`inline-flex items-center justify-center text-[9px] sm:text-[9.5px] font-bold px-1 py-0.5 rounded leading-none shadow-sm print-leave-badge ${lenClass}`}
+              style={{ backgroundColor: badgeColor, color: textColor }}
             >
-              {valueHours}/{leaveCode}{leaveHours}
+              {comboText}
             </span>
           )
         }
+
+        const lenClass = leaveCode.length <= 2 
+          ? 'len-1-2' 
+          : leaveCode.length <= 4 
+            ? 'len-3-4' 
+            : 'len-5-plus'
+
+        const webTextSize = leaveCode.length <= 2 
+          ? 'text-xs' 
+          : leaveCode.length <= 4 
+            ? 'text-[11px]' 
+            : 'text-[9.5px]'
+
         return (
           <span 
-            className="inline-flex items-center justify-center text-xs font-bold w-full h-full rounded text-white leading-none shadow-sm"
-            style={{ backgroundColor: badgeColor }}
+            className={`inline-flex items-center justify-center ${webTextSize} font-bold w-full h-full rounded leading-none shadow-sm print-leave-badge ${lenClass}`}
+            style={{ backgroundColor: badgeColor, color: textColor }}
           >
             {leaveCode}
           </span>
