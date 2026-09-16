@@ -14,7 +14,8 @@ import {
   X,
   ExternalLink,
   Eye,
-  Settings2
+  Settings2,
+  Clipboard
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { 
@@ -74,6 +75,64 @@ export default function OvertimeAiScanModal({
       }
     }
   }, [imagePreviewUrl])
+
+  // Lắng nghe phím tắt Ctrl + V trên toàn Modal để nhận ảnh clipboard
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items
+      if (!items || items.length === 0) return
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) {
+            e.preventDefault()
+            setSelectedFile(file)
+            const preview = URL.createObjectURL(file)
+            setImagePreviewUrl(preview)
+            setDetectedEntries([])
+            toast.success('Đã nhận ảnh dán từ Clipboard (Ctrl + V)!')
+            return
+          }
+        }
+      }
+    }
+
+    window.addEventListener('paste', handlePaste)
+    return () => {
+      window.removeEventListener('paste', handlePaste)
+    }
+  }, [isOpen])
+
+  // Xử lý nút bấm dán từ Clipboard
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (!navigator.clipboard?.read) {
+        toast('Hãy bấm phím tắt Ctrl + V trên bàn phím để dán ảnh nhé!', { icon: '📋' })
+        return
+      }
+      const clipboardItems = await navigator.clipboard.read()
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((t) => t.startsWith('image/'))
+        if (imageType) {
+          const blob = await item.getType(imageType)
+          const file = new File([blob], `clipboard_${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType })
+          setSelectedFile(file)
+          const preview = URL.createObjectURL(file)
+          setImagePreviewUrl(preview)
+          setDetectedEntries([])
+          toast.success('Đã dán ảnh từ Clipboard thành công!')
+          return
+        }
+      }
+      toast('Không tìm thấy ảnh trong Clipboard! Hãy sao chép ảnh hoặc chụp màn hình rồi thử lại.', { icon: '⚠️' })
+    } catch (err) {
+      console.warn('Clipboard read error:', err)
+      toast('Hãy bấm phím tắt Ctrl + V trên bàn phím để dán ảnh nhé!', { icon: '📋' })
+    }
+  }
 
   if (!isOpen) return null
 
@@ -397,12 +456,18 @@ export default function OvertimeAiScanModal({
                     className="max-h-[320px] w-auto max-w-full object-contain rounded-xl shadow-md border border-border/40"
                   />
                   {/* Overlay nút đổi ảnh */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl backdrop-blur-xs">
+                  <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2 rounded-xl backdrop-blur-xs">
+                    <button
+                      onClick={handlePasteFromClipboard}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 shadow flex items-center gap-1.5"
+                    >
+                      <Clipboard className="w-3.5 h-3.5" /> Dán ảnh mới (Ctrl+V)
+                    </button>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-semibold hover:bg-slate-100 shadow flex items-center gap-1.5"
                     >
-                      <ImageIcon className="w-3.5 h-3.5" /> Đổi ảnh
+                      <ImageIcon className="w-3.5 h-3.5" /> Chọn file
                     </button>
                     <button
                       onClick={() => cameraInputRef.current?.click()}
@@ -413,19 +478,33 @@ export default function OvertimeAiScanModal({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 py-6">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mx-auto text-muted-foreground">
-                    <UploadCloud className="w-6 h-6" />
+                <div className="space-y-3 py-4 px-2">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
+                    <Clipboard className="w-6 h-6 animate-pulse" />
                   </div>
                   <div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-xs shadow-xs mb-1.5">
+                      <span>Bấm</span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-background border border-border text-[11px] font-mono shadow-xs text-foreground">
+                        Ctrl + V
+                      </kbd>
+                      <span>để dán ảnh ngay</span>
+                    </div>
                     <p className="text-xs font-semibold text-foreground">
-                      Kéo thả ảnh vào đây, hoặc tải từ thiết bị
+                      Chụp màn hình (Win+Shift+S), copy từ Zalo hoặc kéo thả ảnh
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Hỗ trợ chụp rõ nét các dòng ghi ngày & giờ làm thêm
+                      Hỗ trợ chụp giấy note, sổ tay hoặc danh sách ngày giờ làm thêm
                     </p>
                   </div>
-                  <div className="flex items-center justify-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <Clipboard className="w-3.5 h-3.5" /> Dán ảnh (Ctrl + V)
+                    </button>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -436,9 +515,9 @@ export default function OvertimeAiScanModal({
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold border border-border/70 shadow-xs flex items-center gap-1.5 transition-colors"
                     >
-                      <Camera className="w-3.5 h-3.5" /> Chụp ảnh ngay
+                      <Camera className="w-3.5 h-3.5 text-primary" /> Chụp ảnh
                     </button>
                   </div>
                 </div>
