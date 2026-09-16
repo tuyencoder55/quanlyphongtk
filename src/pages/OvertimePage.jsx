@@ -11,6 +11,7 @@ import {
 } from '@/features/overtime/overtimeService'
 import OvertimeSheet from '@/features/overtime/OvertimeSheet'
 import OvertimeModal from '@/features/overtime/OvertimeModal'
+import OvertimeAiScanModal from '@/features/overtime/OvertimeAiScanModal'
 import { exportOvertimeToExcel } from '@/features/overtime/exportOvertimeExcel'
 import { supabase } from '@/lib/supabase'
 import { 
@@ -46,6 +47,7 @@ export default function OvertimePage() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isAiScanOpen, setIsAiScanOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState(null)
   const [isBulkPrinting, setIsBulkPrinting] = useState(false)
   const [allEmployeesEntries, setAllEmployeesEntries] = useState(new Map())
@@ -496,6 +498,18 @@ export default function OvertimePage() {
                 <span>Chấm Xuống Ca Hôm Nay</span>
               </button>
 
+              {/* Nút Quét Giấy Note Tăng Ca Bằng AI */}
+              {(canEdit || (!isAdmin && profile?.employee_id === selectedEmpId)) && (
+                <button
+                  onClick={() => setIsAiScanOpen(true)}
+                  title="Chụp ảnh giấy note viết tay, AI tự động nhận diện và điền vào biểu"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-amber-500/15 hover:from-purple-500/25 hover:via-pink-500/25 hover:to-amber-500/25 text-amber-600 dark:text-amber-300 border border-amber-500/35 shadow-xs transition-all active:scale-95 shrink-0 whitespace-nowrap"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <span>Quét Giấy Note (AI)</span>
+                </button>
+              )}
+
               {/* Nút Thêm / Sửa ca tăng ca (Admin hoặc Nhân viên đang mở phiếu của chính mình) */}
               {(canEdit || (!isAdmin && profile?.employee_id === selectedEmpId)) && (
                 <button
@@ -624,6 +638,20 @@ export default function OvertimePage() {
           period={period}
           days={days}
           employee={currentEmployee}
+        />
+      )}
+
+      {/* Modal Quét giấy note bằng AI (Gemini Vision) */}
+      {isAiScanOpen && (
+        <OvertimeAiScanModal
+          isOpen={isAiScanOpen}
+          onClose={() => setIsAiScanOpen(false)}
+          period={period}
+          employee={currentEmployee}
+          days={days}
+          onSuccess={() => {
+            loadEmployeeEntries()
+          }}
         />
       )}
     </div>
