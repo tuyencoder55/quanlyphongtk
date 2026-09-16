@@ -6,7 +6,8 @@ import {
   getEmployeeOvertimeEntries, 
   saveOvertimeEntry, 
   deleteOvertimeEntry,
-  quickClockOutToday 
+  quickClockOutToday,
+  getDefaultOvertimeReason 
 } from '@/features/overtime/overtimeService'
 import OvertimeSheet from '@/features/overtime/OvertimeSheet'
 import OvertimeModal from '@/features/overtime/OvertimeModal'
@@ -93,19 +94,21 @@ export default function OvertimePage() {
       return
     }
     try {
+      const emp = employees.find((e) => e.id === selectedEmpId)
       const data = await getEmployeeOvertimeEntries(
         period.id, 
         selectedEmpId, 
         period.month, 
         period.year, 
-        days
+        days,
+        emp?.department || 'TK'
       )
       setEntries(data)
     } catch (err) {
       console.error('Lỗi tải ca tăng ca:', err)
       toast.error('Lỗi tải ca tăng ca của nhân viên')
     }
-  }, [period, selectedEmpId, days])
+  }, [period, selectedEmpId, days, employees])
 
   useEffect(() => {
     loadEmployeeEntries()
@@ -165,7 +168,12 @@ export default function OvertimePage() {
     const isTodaySunday = todayDate.getDay() === 0
 
     try {
-      const res = await quickClockOutToday(period.id, currentEmployee.id, isTodaySunday)
+      const res = await quickClockOutToday(
+        period.id, 
+        currentEmployee.id, 
+        isTodaySunday, 
+        currentEmployee.department || 'TK'
+      )
       toast.success(`Đã ghi nhận ca tăng ca ngày ${res.day}: ${res.hours} giờ (${res.startTime} — ${res.endTime})!`)
       loadEmployeeEntries()
     } catch (err) {
@@ -176,7 +184,10 @@ export default function OvertimePage() {
   // 4. Lưu ca tăng ca từ modal
   const handleSaveModal = async (payload) => {
     try {
-      await saveOvertimeEntry(payload)
+      await saveOvertimeEntry({
+        ...payload,
+        department: currentEmployee?.department || 'TK'
+      })
       toast.success(`Đã lưu ca tăng ca ngày ${payload.day}: ${payload.hours} giờ!`)
       setIsModalOpen(false)
       setEditingEntry(null)
@@ -271,7 +282,8 @@ export default function OvertimePage() {
           emp.id,
           period.month,
           period.year,
-          days
+          days,
+          emp?.department || 'TK'
         )
         map.set(emp.id, empEntries)
       }
@@ -325,7 +337,7 @@ export default function OvertimePage() {
         period,
         employee: currentEmployee,
         entries,
-        reason: 'Xử lý file / 处理档案'
+        reason: getDefaultOvertimeReason(currentEmployee?.department)
       })
       toast.success(`Đã xuất file Excel tăng ca của ${currentEmployee.full_name}!`)
     } catch (err) {
@@ -573,7 +585,7 @@ export default function OvertimePage() {
                     period={period}
                     employee={emp}
                     entries={empEntries}
-                    reason="Xử lý file / 处理档案"
+                    reason={getDefaultOvertimeReason(emp?.department)}
                     isBulkPrint={true}
                   />
                 )
@@ -585,7 +597,7 @@ export default function OvertimePage() {
               period={period}
               employee={currentEmployee}
               entries={entries}
-              reason="Xử lý file / 处理档案"
+              reason={getDefaultOvertimeReason(currentEmployee?.department)}
               isBulkPrint={false}
               canEdit={canEdit || (!isAdmin && profile?.employee_id === selectedEmpId)}
               onEditEntry={(entry) => {

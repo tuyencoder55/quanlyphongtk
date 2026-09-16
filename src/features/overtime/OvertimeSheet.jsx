@@ -5,12 +5,21 @@ export default function OvertimeSheet({
   period,
   employee,
   entries = [],
-  reason = 'Xử lý file / 处理档案',
+  reason,
   isBulkPrint = false,
   canEdit = false,
   onEditEntry,
   onDeleteEntry
 }) {
+  const defaultReason = employee?.department === 'CTP'
+    ? 'Xuất rửa bảng, sắp xếp bảng CTP/出版、洗版、整理CTP版。'
+    : 'Xử lý file / 处理档案'
+
+  // Ưu tiên lý do của CTP nếu nhân viên thuộc CTP và chưa có lý do riêng biệt
+  const displayReason = (employee?.department === 'CTP' && (!reason || reason === 'Xử lý file / 处理档案'))
+    ? defaultReason
+    : (reason || defaultReason)
+
   const totalHours = entries.reduce((sum, e) => sum + Number(e.hours || 0), 0)
 
   // Bảng chuẩn 30 dòng theo yêu cầu (đầy đủ cho cả tháng, vừa khít 1 trang A4 dọc)
@@ -71,7 +80,7 @@ export default function OvertimeSheet({
           </div>
         </div>
         <div className="pl-3">
-          <span className="font-semibold">Lý do tăng ca / 加班理由:</span> <span className="font-medium underline underline-offset-2">{reason}</span>
+          <span className="font-semibold">Lý do tăng ca / 加班理由:</span> <span className="font-medium underline underline-offset-2">{displayReason}</span>
         </div>
         <div className="font-semibold text-center italic pt-0.5 text-[7.5pt]">
           Đề nghị Công ty chấp thuận cho chúng tôi được tăng ca / 建议公司允许我们加班:

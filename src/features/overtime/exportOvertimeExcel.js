@@ -3,7 +3,15 @@ import * as XLSX from 'xlsx'
 /**
  * Xuất file Excel Giấy Đề Nghị Tăng Ca chuẩn khổ A4 Dọc (Portrait) theo mẫu biểu tăng ca.png
  */
-export function exportOvertimeToExcel({ period, employee, entries = [], reason = 'Xử lý file / 处理档案' }) {
+export function exportOvertimeToExcel({ period, employee, entries = [], reason }) {
+  const defaultReason = employee?.department === 'CTP'
+    ? 'Xuất rửa bảng, sắp xếp bảng CTP/出版、洗版、整理CTP版。'
+    : 'Xử lý file / 处理档案'
+
+  const finalReason = (employee?.department === 'CTP' && (!reason || reason === 'Xử lý file / 处理档案'))
+    ? defaultReason
+    : (reason || defaultReason)
+
   const aoa = []
 
   // 1. Quốc hiệu & Tiêu ngữ
@@ -27,7 +35,7 @@ export function exportOvertimeToExcel({ period, employee, entries = [], reason =
   const deptTitle = (employee?.department === 'CTP') ? 'CTP CTP部' : 'Thiết kế 设计部'
   aoa.push([`- Phòng bộ phận/部门 : ${deptTitle}`])
   aoa.push([`Kỳ tăng ca/日期 : Tháng/月 ${String(period?.month).padStart(2, '0')} Năm/年 ${period?.year}`])
-  aoa.push([`Lý do tăng ca/加班理由: ${reason}`])
+  aoa.push([`Lý do tăng ca/加班理由: ${finalReason}`])
   aoa.push(['Đề nghị Công ty chấp thuận cho chúng tôi được tăng ca: 建议公司允许我们加班'])
   aoa.push([])
 

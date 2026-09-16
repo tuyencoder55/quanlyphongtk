@@ -1,7 +1,18 @@
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 
-// Khóa lưu cấu hình chi tiết ca (giờ vào/ra tùy biến nếu có) trong localStorage
-const OVERTIME_DETAIL_KEY = 'quanlyphongtk_ot_details'
+// Key lưu trữ localStorage cho chi tiết giờ vào / giờ ra của các ca tăng ca
+const STORAGE_KEY = 'quanlyphongtk_overtime_details_v1'
+const OVERTIME_DETAIL_KEY = STORAGE_KEY
+
+// Lý do tăng ca mặc định theo từng bộ phận
+export const DEFAULT_OVERTIME_REASONS = {
+  TK: 'Xử lý file / 处理档案',
+  CTP: 'Xuất rửa bảng, sắp xếp bảng CTP/出版、洗版、整理CTP版。'
+}
+
+export function getDefaultOvertimeReason(department) {
+  return department === 'CTP' ? DEFAULT_OVERTIME_REASONS.CTP : DEFAULT_OVERTIME_REASONS.TK
+}
 
 function getSavedDetails() {
   try {
@@ -108,7 +119,7 @@ export function formatOvertimeTimeString(day, month, year, startTime, endTime) {
  * Lấy danh sách ca tăng ca trong tháng của một nhân viên
  * Nguồn dữ liệu: bảng `timesheet_entries` (lọc row_type = 'overtime' và value_hours > 0)
  */
-export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMonth, periodYear, days) {
+export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMonth, periodYear, days, department = 'TK') {
   const { data: entries, error } = await supabase
     .from('timesheet_entries')
     .select('*')
@@ -121,6 +132,7 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
   if (error) throw error
 
   const savedDetails = getSavedDetails()
+  const defaultReason = getDefaultOvertimeReason(department)
 
   // Ghép chi tiết giờ vào, giờ ra cho từng ngày có tăng ca
   return (entries || []).map((entry) => {
@@ -136,7 +148,12 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
     // Giờ kết thúc LUÔN ĐƯỢC CHUẨN HÓA LÀM TRÒN theo số giờ tăng ca (ví dụ 16h30 -> 19h42 tính 3h phải ghi là 16h30 — 19h30)
     const roundedEndTime = calculateEndTimeFromHours(startTime, Number(entry.value_hours), isSunday)
     const endTime = roundedEndTime || detail?.endTime || ''
-    const reason = detail?.reason || 'Xử lý file / 处理档案'
+    
+    // Nếu chưa có lý do hoặc dữ liệu cũ của CTP đang mang lý do của TK thì tự chuyển sang CTP
+    let reason = detail?.reason
+    if (!reason || (department === 'CTP' && reason === DEFAULT_OVERTIME_REASONS.TK)) {
+      reason = defaultReason
+    }
 
     return {
       entryId: entry.id,
@@ -165,10 +182,13 @@ export async function saveOvertimeEntry({
   hours,
   startTime,
   endTime,
-  reason = 'Xử lý file / 处理档案'
+  reason,
+  department = 'TK'
 }) {
   const dayNum = Number(day)
   const hoursNum = Number(hours)
+  const defaultReason = getDefaultOvertimeReason(department)
+  const finalReason = reason?.trim() || defaultReason
 
   // 1. Kiểm tra xem ô ngày này trong timesheet_entries đã có chưa
   const { data: existing } = await supabaseAdmin
@@ -178,51 +198,48 @@ export async function saveOvertimeEntry({
     .eq('employee_id', employeeId)
     .eq('row_type', 'overtime')
     .eq('day', dayNum)
-    .maybeSingle()
+    .single()
 
-  let entryId = existing?.id
-
-  if (entryId) {
-    const { error } = await supabaseAdmin
+  if (existing) {
+    // Cập nhật số giờ
+    const { error: updateErr } = await supabaseAdmin
       .from('timesheet_entries')
       .update({
         value_hours: hoursNum,
         updated_at: new Date().toISOString()
       })
-      .eq('id', entryId)
+      .eq('id', existing.id)
 
-    if (error) throw error
+    if (updateErr) throw updateErr
   } else {
-    const { data: inserted, error } = await supabaseAdmin
+    // Thêm mới
+    const { error: insertErr } = await supabaseAdmin
       .from('timesheet_entries')
       .insert({
         period_id: periodId,
         employee_id: employeeId,
         row_type: 'overtime',
         day: dayNum,
-        value_hours: hoursNum,
+        value_hours: hoursNum
       })
-      .select()
-      .single()
 
-    if (error) throw error
-    entryId = inserted.id
+    if (insertErr) throw insertErr
   }
 
-  // 2. Lưu chi tiết giờ vào/ra và lý do
+  // 2. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage
   const storageKey = `${periodId}_${employeeId}_${dayNum}`
   saveDetailToStorage(storageKey, {
     startTime,
     endTime,
-    reason,
-    hours: hoursNum,
+    reason: finalReason
   })
 
-  return { id: entryId, success: true }
+  return { success: true }
 }
 
 /**
- * Xoá một ca tăng ca (đặt value_hours về 0)
+ * Xoá một ca tăng ca
+ * Cập nhật số giờ về 0 trong timesheet_entries và xoá chi tiết trong localStorage
  */
 export async function deleteOvertimeEntry(periodId, employeeId, day) {
   const dayNum = Number(day)
@@ -237,7 +254,6 @@ export async function deleteOvertimeEntry(periodId, employeeId, day) {
     .eq('employee_id', employeeId)
     .eq('row_type', 'overtime')
     .eq('day', dayNum)
-    .select()
 
   if (error) throw error
 
@@ -251,7 +267,7 @@ export async function deleteOvertimeEntry(periodId, employeeId, day) {
  * Chấm nhanh Xuống ca hôm nay (1 chạm)
  * Lấy giờ máy tính hiện tại, làm tròn theo quy tắc 30p lùi, lưu ngay
  */
-export async function quickClockOutToday(periodId, employeeId, isSunday = false) {
+export async function quickClockOutToday(periodId, employeeId, isSunday = false, department = 'TK') {
   const now = new Date()
   const currentDay = now.getDate()
   const currentHour = now.getHours()
@@ -269,6 +285,7 @@ export async function quickClockOutToday(periodId, employeeId, isSunday = false)
 
   // Giờ kết thúc được làm tròn theo số giờ được tính (ví dụ 16h30 -> 19h42 tính 3h thì ghi là 19:30)
   const roundedEndTime = calculateEndTimeFromHours(defaultStartTime, hours, isSunday)
+  const defaultReason = getDefaultOvertimeReason(department)
 
   await saveOvertimeEntry({
     periodId,
@@ -277,7 +294,8 @@ export async function quickClockOutToday(periodId, employeeId, isSunday = false)
     hours,
     startTime: defaultStartTime,
     endTime: roundedEndTime,
-    reason: 'Xử lý file / 处理档案'
+    reason: defaultReason,
+    department
   })
 
   return {

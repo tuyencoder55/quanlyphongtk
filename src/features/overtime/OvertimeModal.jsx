@@ -17,7 +17,15 @@ export default function OvertimeModal({
   const [endTime, setEndTime] = useState(initialData?.endTime || '18:30')
   const [hours, setHours] = useState(initialData?.hours || 2.0)
   const [manualHours, setManualHours] = useState(false)
-  const [reason, setReason] = useState(initialData?.reason || 'Xử lý file / 处理档案')
+  const defaultDeptReason = employee?.department === 'CTP'
+    ? 'Xuất rửa bảng, sắp xếp bảng CTP/出版、洗版、整理CTP版。'
+    : 'Xử lý file / 处理档案'
+
+  const initialReason = (employee?.department === 'CTP' && (!initialData?.reason || initialData?.reason === 'Xử lý file / 处理档案'))
+    ? defaultDeptReason
+    : (initialData?.reason || defaultDeptReason)
+
+  const [reason, setReason] = useState(initialReason)
 
   // Xác định ngày đang chọn có phải Chủ Nhật không
   const selectedDayInfo = days.find((d) => d.day === Number(day))
@@ -63,7 +71,7 @@ export default function OvertimeModal({
       hours: Number(hours),
       startTime,
       endTime: roundedEndTime,
-      reason: reason.trim() || 'Xử lý file / 处理档案'
+      reason: reason.trim() || defaultDeptReason
     })
   }
 
@@ -188,7 +196,7 @@ export default function OvertimeModal({
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Xử lý file / 处理档案"
+              placeholder={defaultDeptReason}
               className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
