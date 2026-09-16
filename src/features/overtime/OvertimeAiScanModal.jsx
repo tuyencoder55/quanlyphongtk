@@ -648,7 +648,7 @@ export default function OvertimeAiScanModal({
                             >
                               {days.map((d) => (
                                 <option key={d.day} value={d.day}>
-                                  Ngày {String(d.day).padStart(2, '0')} {d.isSunday ? '(CN)' : `(${d.dayOfWeek})`}
+                                  Ngày {d.dayFormatted || String(d.day).padStart(2, '0')} ({d.vi || (d.isSunday ? 'CN' : '')})
                                 </option>
                               ))}
                             </select>
