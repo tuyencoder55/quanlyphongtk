@@ -110,8 +110,14 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
 }
 `
 
-  // Danh sách các model Gemini thử theo thứ tự ưu tiên
-  const modelCandidates = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash']
+  // Danh sách các model Gemini thử theo thứ tự ưu tiên (ưu tiên các model Gemini 3 Flash mới nhất)
+  const modelCandidates = [
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash'
+  ]
   let lastError = null
 
   for (const model of modelCandidates) {
@@ -153,7 +159,9 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
       }
 
       const resJson = await response.json()
-      const textOutput = resJson?.candidates?.[0]?.content?.parts?.[0]?.text
+      const parts = resJson?.candidates?.[0]?.content?.parts || []
+      const textPart = parts.find((p) => p.text && !p.thought) || parts.find((p) => p.text)
+      const textOutput = textPart?.text
       if (!textOutput) {
         throw new Error('AI không trả về nội dung nhận diện được từ ảnh!')
       }
