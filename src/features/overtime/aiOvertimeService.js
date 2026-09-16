@@ -110,13 +110,11 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
 }
 `
 
-  // Danh sách các model Gemini thử theo thứ tự ưu tiên (ưu tiên các model Gemini 3 Flash mới nhất)
+  // Danh sách các model Gemini thử theo thứ tự ưu tiên (ưu tiên các model Flash đang hoạt động tốt nhất)
   const modelCandidates = [
+    'gemini-flash-latest',
     'gemini-3.6-flash',
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash'
+    'gemini-3.8-flash'
   ]
   let lastError = null
 
@@ -215,6 +213,14 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
       console.warn(`Lỗi khi gọi model ${model}:`, err)
       // Thử model kế tiếp
     }
+  }
+
+  const errText = lastError?.message || ''
+  if (errText.includes('503') || errText.toLowerCase().includes('high demand') || errText.toLowerCase().includes('unavailable')) {
+    throw new Error('Máy chủ Google AI hiện đang quá tải tạm thời (High Demand). Anh/chị vui lòng bấm "Bắt đầu Quét bằng AI" thử lại sau 5 - 10 giây nhé!')
+  }
+  if (errText.includes('API_KEY_INVALID') || (errText.includes('400') && errText.includes('key'))) {
+    throw new Error('API Key Google Gemini không hợp lệ hoặc đã hết hạn. Vui lòng bấm nút "Đổi API Key" ở góc trên để cập nhật key mới!')
   }
 
   throw new Error(lastError?.message || 'Không thể kết nối với Google Gemini AI. Vui lòng kiểm tra lại API Key và kết nối mạng!')
