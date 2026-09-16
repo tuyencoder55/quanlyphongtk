@@ -339,7 +339,7 @@ export default function OvertimeAiScanModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card border border-border/80 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-card border border-border/80 rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* HEADER MODAL */}
         <div className="px-5 py-3.5 border-b border-border/60 bg-secondary/30 flex items-center justify-between shrink-0">
@@ -603,7 +603,7 @@ export default function OvertimeAiScanModal({
                 </div>
               ) : (
                 <div className="overflow-x-auto flex-1">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full min-w-[620px] text-left text-xs border-collapse">
                     <thead className="bg-secondary/60 text-muted-foreground text-[10.5px] uppercase font-semibold border-b border-border/60 sticky top-0 backdrop-blur-xs">
                       <tr>
                         <th className="p-2.5 text-center w-10">
@@ -614,10 +614,10 @@ export default function OvertimeAiScanModal({
                             className="rounded accent-primary cursor-pointer"
                           />
                         </th>
-                        <th className="p-2.5 w-24">Ngày</th>
-                        <th className="p-2.5 w-40">Thời gian</th>
-                        <th className="p-2.5 w-20 text-center">Số giờ</th>
-                        <th className="p-2.5">Lý do tăng ca</th>
+                        <th className="p-2.5 w-40 min-w-[145px]">Ngày</th>
+                        <th className="p-2.5 w-48 min-w-[185px]">Thời gian</th>
+                        <th className="p-2.5 w-20 min-w-[76px] text-center">Số giờ</th>
+                        <th className="p-2.5 min-w-[130px]">Lý do tăng ca</th>
                         <th className="p-2.5 text-center w-10"></th>
                       </tr>
                     </thead>
@@ -640,11 +640,11 @@ export default function OvertimeAiScanModal({
                           </td>
 
                           {/* Chọn Ngày */}
-                          <td className="p-2">
+                          <td className="p-2 w-40 min-w-[145px]">
                             <select
                               value={item.day}
                               onChange={(e) => handleUpdateItem(item.id, 'day', Number(e.target.value))}
-                              className="w-full bg-background border border-border/70 rounded-lg px-2 py-1 text-xs font-bold text-foreground outline-none focus:ring-1 focus:ring-primary"
+                              className="w-full bg-background border border-border/70 rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                             >
                               {days.map((d) => (
                                 <option key={d.day} value={d.day}>
@@ -655,26 +655,26 @@ export default function OvertimeAiScanModal({
                           </td>
 
                           {/* Thời gian vào - ra */}
-                          <td className="p-2">
-                            <div className="flex items-center gap-1">
+                          <td className="p-2 w-48 min-w-[185px]">
+                            <div className="flex items-center gap-1.5">
                               <input
                                 type="time"
                                 value={item.startTime}
                                 onChange={(e) => handleUpdateItem(item.id, 'startTime', e.target.value)}
-                                className="w-18 bg-background border border-border/70 rounded-lg px-1.5 py-1 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
+                                className="w-[82px] bg-background border border-border/70 rounded-lg px-1.5 py-1.5 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
                               />
-                              <span className="text-muted-foreground text-[10px]">—</span>
+                              <span className="text-muted-foreground text-xs font-bold">—</span>
                               <input
                                 type="time"
                                 value={item.endTime}
                                 onChange={(e) => handleUpdateItem(item.id, 'endTime', e.target.value)}
-                                className="w-18 bg-background border border-border/70 rounded-lg px-1.5 py-1 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
+                                className="w-[82px] bg-background border border-border/70 rounded-lg px-1.5 py-1.5 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
                               />
                             </div>
                           </td>
 
                           {/* Số giờ */}
-                          <td className="p-2 text-center">
+                          <td className="p-2 text-center w-20 min-w-[76px]">
                             <input
                               type="number"
                               step="0.5"
@@ -682,7 +682,7 @@ export default function OvertimeAiScanModal({
                               max="24"
                               value={item.hours}
                               onChange={(e) => handleUpdateItem(item.id, 'hours', Number(e.target.value))}
-                              className="w-14 bg-background border border-border/70 rounded-lg px-1.5 py-1 text-xs font-bold text-center text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
+                              className="w-14 bg-background border border-border/70 rounded-lg px-1.5 py-1.5 text-xs font-bold text-center text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
                             />
                           </td>
 
