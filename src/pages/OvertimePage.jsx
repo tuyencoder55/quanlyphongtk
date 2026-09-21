@@ -329,13 +329,13 @@ export default function OvertimePage() {
   }
 
   // 8. Xuất file Excel chuẩn A4 Dọc
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!period || !currentEmployee) {
       toast.error('Chưa có thông tin để xuất Excel!')
       return
     }
     try {
-      exportOvertimeToExcel({
+      await exportOvertimeToExcel({
         period,
         employee: currentEmployee,
         entries,
