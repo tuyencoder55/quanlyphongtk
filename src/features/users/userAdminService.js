@@ -90,7 +90,7 @@ export async function fetchUserAccounts() {
  */
 export async function createUserAccount({
   username,
-  password,
+  password = '123456',
   fullName,
   role = 'member',
   canEdit = false,
@@ -100,7 +100,8 @@ export async function createUserAccount({
   const cleanUsername = String(username).trim().toLowerCase()
   if (!cleanUsername) throw new Error('Tên đăng nhập không được để trống')
   if (cleanUsername.length < 3) throw new Error('Tên đăng nhập phải có ít nhất 3 ký tự')
-  if (!password || password.length < 6) throw new Error('Mật khẩu phải có ít nhất 6 ký tự')
+  const finalPassword = (password && String(password).trim()) ? String(password).trim() : '123456'
+  if (finalPassword.length < 6) throw new Error('Mật khẩu phải có ít nhất 6 ký tự')
 
   const adminClient = getAdminClient()
   const email = toInternalEmail(cleanUsername)
@@ -108,7 +109,7 @@ export async function createUserAccount({
   // 1. Tạo Auth User trên Supabase
   const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
     email,
-    password,
+    password: finalPassword,
     email_confirm: true, // Kích hoạt ngay không cần email xác nhận
     user_metadata: {
       username: cleanUsername,
@@ -158,6 +159,13 @@ export async function updateUserPassword(userId, newPassword) {
 
   if (error) throw new Error('Lỗi khi đổi mật khẩu: ' + error.message)
   return data
+}
+
+/**
+ * Đặt lại mật khẩu về mặc định "123456"
+ */
+export async function resetUserPasswordToDefault(userId) {
+  return updateUserPassword(userId, '123456')
 }
 
 /**

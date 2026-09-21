@@ -21,7 +21,8 @@ import toast from 'react-hot-toast'
 import { 
   fetchUserAccounts, 
   toggleUserLock, 
-  deleteUserAccount 
+  deleteUserAccount,
+  resetUserPasswordToDefault
 } from '@/features/users/userAdminService'
 import { getEmployees } from '@/features/employees/employeeService'
 import UserModal from '@/features/users/UserModal'
@@ -86,6 +87,20 @@ export default function UsersPage() {
       loadData()
     } catch (err) {
       toast.error('Lỗi: ' + err.message)
+    }
+  }
+
+  // Xử lý Reset mật khẩu về mặc định 123456
+  const handleResetPasswordDefault = async (account) => {
+    const confirmMsg = `Bạn có chắc muốn RESET mật khẩu của tài khoản "${account.username}" (${account.fullName}) về mặc định "123456" không?\n\nNhân viên sẽ có thể đăng nhập ngay bằng mật khẩu 123456 sau khi reset.`
+    if (!window.confirm(confirmMsg)) return
+
+    const toastId = toast.loading(`Đang reset mật khẩu cho "${account.username}"...`)
+    try {
+      await resetUserPasswordToDefault(account.id)
+      toast.success(`Đã reset mật khẩu tài khoản "${account.username}" về mặc định 123456 thành công!`, { id: toastId })
+    } catch (err) {
+      toast.error('Lỗi khi reset mật khẩu: ' + err.message, { id: toastId })
     }
   }
 
@@ -397,13 +412,22 @@ export default function UsersPage() {
                       {/* Thao tác */}
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          {/* Nút Đổi mật khẩu */}
+                          {/* Nút Reset mật khẩu về mặc định 123456 */}
+                          <button
+                            onClick={() => handleResetPasswordDefault(acc)}
+                            title="Reset mật khẩu về mặc định (123456)"
+                            className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+
+                          {/* Nút Đổi mật khẩu tuỳ chọn */}
                           <button
                             onClick={() => {
                               setAccountForPassword(acc)
                               setPasswordModalOpen(true)
                             }}
-                            title="Đổi mật khẩu cho tài khoản này"
+                            title="Đổi mật khẩu tuỳ chọn cho tài khoản này"
                             className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors"
                           >
                             <KeyRound className="w-4 h-4" />
@@ -455,6 +479,18 @@ export default function UsersPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Ghi chú hướng dẫn cho Quản trị viên */}
+      <div className="bg-secondary/40 border border-border/60 rounded-xl p-3.5 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <RotateCcw className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span><b>Reset Mật Khẩu (↺):</b> Khi nhân viên quên mật khẩu, bấm để đưa về mặc định <span className="font-mono text-foreground font-semibold">123456</span> ngay lập tức.</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
+          <span><b>Đổi Mật Khẩu (🔑):</b> Nhập mật khẩu tùy chỉnh riêng.</span>
+        </div>
       </div>
       </>
       )}

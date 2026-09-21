@@ -85,7 +85,8 @@ export default function UserModal({
       return
     }
 
-    if (!isEditing && (!password || password.length < 6)) {
+    const finalPassword = (!password || !password.trim()) ? '123456' : password.trim()
+    if (!isEditing && finalPassword.length < 6) {
       toast.error('Mật khẩu khởi tạo phải có ít nhất 6 ký tự!')
       return
     }
@@ -104,7 +105,7 @@ export default function UserModal({
       } else {
         await createUserAccount({
           username: cleanUsername,
-          password,
+          password: finalPassword,
           fullName: fullName.trim() || cleanUsername,
           role,
           canEdit: role === 'admin' ? true : canEdit,
@@ -213,16 +214,25 @@ export default function UserModal({
           {/* Mật khẩu khởi tạo (Chỉ hiển thị khi Tạo Mới) */}
           {!isEditing && (
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">
-                Mật khẩu khởi tạo <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-foreground">
+                  Mật khẩu khởi tạo <span className="text-rose-400">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPassword('123456')}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline inline-flex items-center gap-1 font-medium transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Mặc định: 123456
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  required={!isEditing}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Tối thiểu 6 ký tự (mặc định: 123456)"
+                  placeholder="Mặc định: 123456 (tối thiểu 6 ký tự)"
                   className="w-full pl-3.5 pr-10 py-2.5 bg-secondary/50 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-mono"
                 />
                 <button
@@ -234,7 +244,7 @@ export default function UserModal({
                 </button>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Admin có thể đổi lại mật khẩu cho nhân viên bất cứ lúc nào qua nút "Đổi Mật Khẩu".
+                Mặc định là <b className="text-foreground">123456</b> (nếu để trống hệ thống sẽ tự động dùng 123456).
               </p>
             </div>
           )}

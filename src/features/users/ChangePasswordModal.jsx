@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { KeyRound, Eye, EyeOff, Loader2, X, Check } from 'lucide-react'
+import { KeyRound, Eye, EyeOff, Loader2, X, Check, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { updateUserPassword } from './userAdminService'
 
@@ -39,6 +39,13 @@ export default function ChangePasswordModal({ isOpen, onClose, account, onSucces
     }
   }
 
+  // Đặt nhanh về mật khẩu mặc định 123456
+  const handleSetDefaultPassword = () => {
+    setNewPassword('123456')
+    setConfirmPassword('123456')
+    toast.success('Đã điền mật khẩu mặc định: 123456')
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-card border border-border/80 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
@@ -67,9 +74,19 @@ export default function ChangePasswordModal({ isOpen, onClose, account, onSucces
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
-              Mật khẩu mới <span className="text-rose-400">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-foreground">
+                Mật khẩu mới <span className="text-rose-400">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleSetDefaultPassword}
+                className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline inline-flex items-center gap-1 font-medium transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Điền mặc định: 123456
+              </button>
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
