@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
@@ -217,3 +218,38 @@ export async function deleteUserAccount(userId) {
   if (error) throw new Error('Lỗi khi xoá tài khoản: ' + error.message)
   return data
 }
+
+/**
+ * Thành viên tự đổi mật khẩu cho chính mình (dùng Supabase Auth)
+ */
+export async function changeMyPassword(newPassword) {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự!')
+  }
+
+  // 1. Cập nhật qua auth.updateUser của Supabase (dành cho user đang đăng nhập)
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  })
+
+  if (error) {
+    // 2. Dự phòng: dùng getAdminClient nếu có service_role
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const currentUserId = sessionData?.session?.user?.id
+      if (currentUserId) {
+        const adminClient = getAdminClient()
+        const { error: adminErr } = await adminClient.auth.admin.updateUserById(currentUserId, {
+          password: newPassword,
+        })
+        if (!adminErr) return { success: true }
+      }
+    } catch (fallbackErr) {
+      console.warn('Fallback admin change password failed:', fallbackErr)
+    }
+    throw new Error('Lỗi khi đổi mật khẩu: ' + error.message)
+  }
+
+  return data
+}
+

@@ -15,9 +15,11 @@ import {
   X,
   Shield,
   ShieldCheck,
-  Layers
+  Layers,
+  KeyRound
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import SelfChangePasswordModal from '@/features/users/SelfChangePasswordModal'
 
 export default function Layout({ children }) {
   const { user, profile, signOut } = useAuthStore()
@@ -28,6 +30,8 @@ export default function Layout({ children }) {
   const [collapsed, setCollapsed] = useState(false)
   // Mở menu trên thiết bị di động
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Modal đổi mật khẩu cá nhân
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
 
   const handleSignOut = async () => {
     try {
@@ -204,14 +208,24 @@ export default function Layout({ children }) {
               </div>
             )}
 
-            {/* Nút Đăng xuất */}
-            <button
-              onClick={handleSignOut}
-              title="Đăng xuất"
-              className="p-2 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {/* Các nút hành động: Đổi mật khẩu & Đăng xuất */}
+            <div className={`flex items-center gap-1 shrink-0 ${collapsed ? 'flex-col' : ''}`}>
+              <button
+                onClick={() => setChangePasswordOpen(true)}
+                title="Đổi mật khẩu tài khoản của bạn"
+                className="p-2 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
+              >
+                <KeyRound className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleSignOut}
+                title="Đăng xuất"
+                className="p-2 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -239,8 +253,18 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* Thông báo góc phải */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {/* Thông báo và Thao tác góc phải */}
+          <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+            {/* Nút Đổi mật khẩu nhanh trên Header */}
+            <button
+              onClick={() => setChangePasswordOpen(true)}
+              title="Đổi mật khẩu tài khoản của bạn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary/80 hover:bg-secondary text-xs font-semibold text-foreground border border-border/60 hover:border-amber-500/40 transition-all hover:shadow-sm cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">Đổi mật khẩu</span>
+            </button>
+
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/70 border border-border/50">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Hệ thống trực tuyến</span>
@@ -255,6 +279,14 @@ export default function Layout({ children }) {
           </div>
         </main>
       </div>
+
+      {/* Modal Đổi Mật Khẩu Cá Nhân cho thành viên */}
+      <SelfChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+        user={user}
+        profile={profile}
+      />
     </div>
   )
 }
