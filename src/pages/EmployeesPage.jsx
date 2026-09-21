@@ -17,9 +17,10 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getEmployees, deleteEmployee, restoreEmployee } from '@/features/employees/employeeService'
-import { fetchUserAccounts } from '@/features/users/userAdminService'
+import { fetchUserAccounts, resetUserPasswordToDefault } from '@/features/users/userAdminService'
 import EmployeeModal from '@/features/employees/EmployeeModal'
 import UserModal from '@/features/users/UserModal'
+import ChangePasswordModal from '@/features/users/ChangePasswordModal'
 
 export default function EmployeesPage() {
   const { profile } = useAuthStore()
@@ -39,6 +40,8 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [userModalOpen, setUserModalOpen] = useState(false)
   const [empForUserModal, setEmpForUserModal] = useState(null)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [accountForPassword, setAccountForPassword] = useState(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -84,6 +87,20 @@ export default function EmployeesPage() {
       loadData()
     } catch (err) {
       toast.error('Lỗi: ' + err.message)
+    }
+  }
+
+  // Xử lý Reset mật khẩu về mặc định 123456
+  const handleResetPasswordDefault = async (account) => {
+    const confirmMsg = `Bạn có chắc muốn RESET mật khẩu của tài khoản "${account.username}" (${account.fullName || ''}) về mặc định "123456" không?\n\nNhân viên sẽ đăng nhập bằng mật khẩu 123456 sau khi reset.`
+    if (!window.confirm(confirmMsg)) return
+
+    const toastId = toast.loading(`Đang reset mật khẩu cho "${account.username}"...`)
+    try {
+      await resetUserPasswordToDefault(account.id)
+      toast.success(`Đã reset mật khẩu tài khoản "${account.username}" về mặc định 123456 thành công!`, { id: toastId })
+    } catch (err) {
+      toast.error('Lỗi khi reset mật khẩu: ' + err.message, { id: toastId })
     }
   }
 
@@ -328,18 +345,41 @@ export default function EmployeesPage() {
                       {isAdmin && (
                         <td className="py-3.5 px-4 text-center">
                           {linkedAccount ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs">
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  !linkedAccount.isLocked ? 'bg-emerald-400' : 'bg-rose-400'
-                                }`}
-                              />
-                              <span className="font-mono font-semibold text-blue-400">
-                                {linkedAccount.username}
-                              </span>
-                              {linkedAccount.isLocked && (
-                                <span className="text-[10px] text-rose-400 font-bold">(Khoá)</span>
-                              )}
+                            <div className="inline-flex items-center justify-center gap-1">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs">
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    !linkedAccount.isLocked ? 'bg-emerald-400' : 'bg-rose-400'
+                                  }`}
+                                />
+                                <span className="font-mono font-semibold text-blue-400">
+                                  {linkedAccount.username}
+                                </span>
+                                {linkedAccount.isLocked && (
+                                  <span className="text-[10px] text-rose-400 font-bold">(Khoá)</span>
+                                )}
+                              </div>
+
+                              {/* Nút Reset mật khẩu về mặc định 123456 */}
+                              <button
+                                onClick={() => handleResetPasswordDefault(linkedAccount)}
+                                title="Reset mật khẩu tài khoản về mặc định (123456)"
+                                className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Nút Đổi mật khẩu tùy chọn */}
+                              <button
+                                onClick={() => {
+                                  setAccountForPassword(linkedAccount)
+                                  setPasswordModalOpen(true)
+                                }}
+                                title="Đổi mật khẩu tài khoản này"
+                                className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           ) : (
                             <button
@@ -442,6 +482,17 @@ export default function EmployeesPage() {
         }}
         preselectedEmployee={empForUserModal}
         employees={employees}
+        onSuccess={loadData}
+      />
+
+      {/* Modal Đổi Mật Khẩu Nhanh Cho Tài Khoản Nhân Viên */}
+      <ChangePasswordModal
+        isOpen={passwordModalOpen}
+        onClose={() => {
+          setPasswordModalOpen(false)
+          setAccountForPassword(null)
+        }}
+        account={accountForPassword}
         onSuccess={loadData}
       />
     </div>
