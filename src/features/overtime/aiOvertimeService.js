@@ -212,9 +212,9 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
 
   // Danh sách các model Gemini ưu tiên nhận diện tốt nhất và tốc độ cao (không delay thinking)
   const modelCandidates = [
-    { name: 'gemini-flash-latest', disableThinking: true },
-    { name: 'gemini-3.6-flash', disableThinking: true },
-    { name: 'gemini-3.8-flash', disableThinking: true }
+    { name: 'gemini-3.6-flash', thinkingConfig: { thinking_level: 'minimal' } },
+    { name: 'gemini-flash-latest', thinkingConfig: { thinking_budget: 0 } },
+    { name: 'gemini-3.8-flash', thinkingConfig: { thinking_level: 'low' } }
   ]
 
   let lastError = null
@@ -228,8 +228,8 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
         response_mime_type: 'application/json',
         temperature: 0.1
       }
-      if (candidate.disableThinking) {
-        generationConfig.thinking_config = { thinking_budget: 0 }
+      if (candidate.thinkingConfig) {
+        generationConfig.thinking_config = candidate.thinkingConfig
       }
 
       const payload = {
@@ -350,6 +350,9 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
   }
 
   const errText = lastError?.message || ''
+  if (errText.includes('429') || errText.toLowerCase().includes('quota')) {
+    throw new Error('Đã chạm giới hạn lượt quét miễn phí trong phút này của Google. Anh/chị vui lòng thử lại sau 10 - 15 giây hoặc bấm "Đổi API Key" ở góc trên nhé!')
+  }
   if (errText.includes('503') || errText.toLowerCase().includes('high demand') || errText.toLowerCase().includes('unavailable')) {
     throw new Error('Máy chủ Google AI hiện đang quá tải tạm thời (High Demand). Anh/chị vui lòng bấm "Bắt đầu Quét bằng AI" thử lại sau 5 - 10 giây nhé!')
   }
