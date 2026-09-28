@@ -210,10 +210,14 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
 }
 `
 
-  // Danh sách các model Gemini ưu tiên nhận diện tốt nhất và tốc độ cao (không delay thinking)
+  // Danh sách các model Gemini ưu tiên nhận diện tốt nhất, nhanh và ổn định về quota:
+  // 1. gemini-3.1-flash-lite: Model thế hệ 3 mới, cực nhanh, quota miễn phí rất rộng (1.500 lượt/ngày), không bị bóp quota
+  // 2. gemini-3.1-flash-lite-preview: Bản preview dự phòng
+  // 3. gemini-3.6-flash & gemini-3.8-flash: Dự phòng nâng cao
   const modelCandidates = [
+    { name: 'gemini-3.1-flash-lite' },
+    { name: 'gemini-3.1-flash-lite-preview' },
     { name: 'gemini-3.6-flash', thinkingConfig: { thinking_level: 'minimal' } },
-    { name: 'gemini-flash-latest', thinkingConfig: { thinking_budget: 0 } },
     { name: 'gemini-3.8-flash', thinkingConfig: { thinking_level: 'low' } }
   ]
 
@@ -351,7 +355,7 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
 
   const errText = lastError?.message || ''
   if (errText.includes('429') || errText.toLowerCase().includes('quota')) {
-    throw new Error('Đã chạm giới hạn lượt quét miễn phí trong phút này của Google. Anh/chị vui lòng thử lại sau 10 - 15 giây hoặc bấm "Đổi API Key" ở góc trên nhé!')
+    throw new Error('API Key này đã dùng hết hạn mức miễn phí hôm nay của Google. Anh/chị có thể bấm nút "Đổi API Key" ở góc trên bên phải để dán key mới (tạo miễn phí tại aistudio.google.com/apikey) nhé!')
   }
   if (errText.includes('503') || errText.toLowerCase().includes('high demand') || errText.toLowerCase().includes('unavailable')) {
     throw new Error('Máy chủ Google AI hiện đang quá tải tạm thời (High Demand). Anh/chị vui lòng bấm "Bắt đầu Quét bằng AI" thử lại sau 5 - 10 giây nhé!')
