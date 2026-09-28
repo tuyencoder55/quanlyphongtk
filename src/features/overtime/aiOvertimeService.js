@@ -1,4 +1,4 @@
-import { getDefaultOvertimeReason } from './overtimeService'
+import { getDefaultOvertimeReason, calculateEndTimeFromHours } from './overtimeService'
 
 const STORAGE_API_KEY = 'quanlyphongtk_gemini_api_key'
 
@@ -7,11 +7,15 @@ const STORAGE_API_KEY = 'quanlyphongtk_gemini_api_key'
  * Ưu tiên: .env (VITE_GEMINI_API_KEY) -> localStorage
  */
 export function getGeminiApiKey() {
+  const localKey = localStorage.getItem(STORAGE_API_KEY)
+  if (localKey && localKey.trim()) {
+    return localKey.trim()
+  }
   const envKey = import.meta.env.VITE_GEMINI_API_KEY
   if (envKey && envKey.trim()) {
     return envKey.trim()
   }
-  return localStorage.getItem(STORAGE_API_KEY) || ''
+  return ''
 }
 
 /**
@@ -142,49 +146,75 @@ export async function scanOvertimeNoteWithGemini({
   const sundayDays = days.filter((d) => d.isSunday).map((d) => d.day)
 
   const prompt = `
-Bạn là chuyên gia nhận diện chữ viết tay và bảng biểu tiếng Việt, có nhiệm vụ đọc ảnh chụp một tờ giấy note viết tay ghi ca tăng ca (làm thêm giờ) của một nhân viên trong công ty.
+Bạn là chuyên gia nhận diện tài liệu, trích xuất dữ liệu bảng biểu và chữ viết tay tiếng Việt. Nhiệm vụ của bạn là đọc ảnh và trích xuất danh sách tất cả các ca TĂNG CA (LÀM THÊM GIỜ) trong tháng của nhân viên.
 
 Thông tin bối cảnh:
 - Tháng tăng ca: Tháng ${periodMonth} năm ${periodYear} (Tháng này có ${daysInMonth} ngày).
-- Các ngày là CHỦ NHẬT trong tháng này: ${sundayDays.join(', ')}. Các ngày còn lại là ngày thường.
+- Danh sách các ngày là CHỦ NHẬT (CN) trong tháng này: ${sundayDays.join(', ')}. Các ngày còn lại là ngày thường.
 - Bộ phận của nhân viên: ${department === 'CTP' ? 'Bộ phận CTP' : 'Phòng Thiết kế'}.
-- Lý do tăng ca mặc định của bộ phận này là: "${defaultReason}".
+- Lý do tăng ca mặc định: "${defaultReason}".
 
-Quy tắc đọc và chuẩn hóa dữ liệu:
-1. Xác định tất cả các ngày tăng ca được ghi trong ảnh:
-   - Người viết có thể ghi: "ngày 2", "2/9", "mùng 5", "12", "15-9", "25", "CN 6"...
-   - Trích xuất thành số ngày nguyên dương (từ 1 đến ${daysInMonth}).
-   - Nếu có nhiều dòng cho cùng 1 ngày, có thể gộp hoặc lấy ca tăng ca chính.
-2. Xác định giờ bắt đầu (startTime), giờ kết thúc (endTime) và số giờ làm thêm (hours):
-   - Nếu trong ảnh có ghi mốc giờ (ví dụ: "16h30 - 19h30", "17h - 20h", "4h30 - 7h30 chiều"...): hãy chuẩn hóa về định dạng 24h "HH:mm".
-   - Nếu chỉ ghi số tiếng (ví dụ: "2 tiếng", "3h", "2.5 tiếng", "4h"):
-     + Nếu ngày đó là NGÀY THƯỜNG: Mặc định giờ bắt đầu là "16:30". Giờ kết thúc = 16:30 + số tiếng (ví dụ làm 2 tiếng thì startTime "16:30", endTime "18:30").
-     + Nếu ngày đó là CHỦ NHẬT (trong danh sách: ${sundayDays.join(', ')}): Mặc định giờ bắt đầu là "07:30". Giờ kết thúc tính theo số tiếng (lưu ý nếu làm cả ngày trên 4h có thể có 1h nghỉ trưa 11:30 - 12:30).
-   - Số giờ tăng ca "hours" là số thực làm tròn theo bước 0.5 (ví dụ: 1.5, 2.0, 2.5, 3.0, 4.0...).
-3. Lý do tăng ca (reason):
-   - Nếu trên giấy note người ta có ghi rõ lý do đặc thù (ví dụ: "Sửa file bao bì", "In gấp...", "Rửa bảng CTP"): hãy ghi lại.
-   - Nếu không ghi lý do riêng, dùng chính xác lý do mặc định: "${defaultReason}".
+HƯỚNG DẪN ĐỌC DỮ LIỆU TÙY THEO LOẠI ẢNH:
 
-Hãy trả về kết quả thuần JSON (không bọc trong markdown code block, không thêm văn bản giải thích thừa) theo cấu trúc sau:
+TRƯỜNG HỢP 1: ẢNH LÀ BẢNG MÁY CHẤM CÔNG (Bảng quẹt vân tay / nhận diện khuôn mặt có các cột: Ngày, Thứ, Chấm lần 1, Chấm lần 2):
+1. Với NGÀY THƯỜNG (Thứ 2 đến Thứ 7):
+   - Giờ làm việc hành chính ban ngày là 07:30 - 16:30 (KHÔNG tính là tăng ca).
+   - Tăng ca ngày thường chỉ bắt đầu tính từ mốc 16:30 chiều.
+   - Nếu giờ về (Chấm lần 2) là từ 17:00 trở đi (tức về sau 16:30 ít nhất 30 phút): ĐÂY LÀ CA TĂNG CA!
+   - Số giờ tăng ca "hours" = (Giờ Chấm lần 2 - 16:30) làm tròn lùi về mốc 30 phút (0.5h).
+     Ví dụ: về 17:01 - 17:29 -> 0.5h; về 17:30 - 17:59 -> 1.0h; về 18:00 - 18:29 (như 18:12) -> 1.5h; về 20:01 -> 3.5h.
+   - startTime LUÔN LUÔN là "16:30" (định dạng 24h, TUYỆT ĐỐI KHÔNG ghi 04:30).
+   - endTime: Ghi mốc giờ kết thúc làm tròn theo số giờ (ví dụ 1.5h thì ghi "18:00", 3.5h ghi "20:00").
+   - Nếu giờ về trước 17:00 (như 16:33, 16:36, 16:39, 16:47): KHÔNG có tăng ca, BỎ QUA ngày đó.
+
+2. Với NGÀY CHỦ NHẬT (CN) - ĐẶC BIỆT CHÚ Ý, TUYỆT ĐỐI KHÔNG ĐƯỢC BỎ SÓT:
+   - Các ngày Chủ Nhật trong tháng là: ${sundayDays.join(', ')}.
+   - Ngày Chủ Nhật công ty KHÔNG làm việc hành chính. BẤT CỨ NGÀY CHỦ NHẬT NÀO CÓ CHẤM CÔNG (có Chấm lần 1 và Chấm lần 2) THÌ TOÀN BỘ ĐỀU LÀ ĐI LÀM TĂNG CA!
+   - Nếu làm cả ngày (Chấm lần 1 khoảng 07:30, Chấm lần 2 khoảng 16:00 - 17:00):
+     + "hours": 8.0 (đã trừ 1h nghỉ trưa 11:30 - 12:30).
+     + "startTime": "07:30"
+     + "endTime": "16:30" (định dạng 24h, TUYỆT ĐỐI KHÔNG ghi 04:30 hay 04:33).
+   - Nếu làm nửa ngày sáng (khoảng 07:30 - 11:30): "hours": 4.0, startTime: "07:30", endTime: "11:30".
+
+TRƯỜNG HỢP 2: ẢNH LÀ GIẤY NOTE / SỔ TAY VIẾT TAY:
+1. Xác định số ngày tăng ca:
+   - Ngày thường: ví dụ "ngày 2", "mùng 9", "10", "15/9"... trích xuất thành số ngày từ 1 đến ${daysInMonth}.
+   - Ngày Chủ Nhật: nếu ghi "CN", "Chủ nhật", "CN 27", "27 (CN)", hoặc chỉ ghi "CN: 8 tiếng": đối chiếu thứ tự tuần hoặc danh sách Chủ Nhật (${sundayDays.join(', ')}) để lấy đúng số ngày Chủ Nhật.
+2. Giờ giấc & số tiếng:
+   - Ngày thường: startTime mặc định "16:30", endTime = 16:30 + số tiếng (ví dụ làm 2h thì endTime "18:30").
+   - Ngày Chủ Nhật: startTime mặc định "07:30", làm cả ngày 8 tiếng thì endTime "16:30".
+
+QUY TẮC BẮT BUỘC:
+- Mọi mốc thời gian bắt buộc dùng chuẩn 24 GIỜ: "16:30", "18:00", "20:00", "07:30"... TUYỆT ĐỐI KHÔNG DÙNG GIỜ 12H (như "04:30", "06:12", "04:33").
+- Số giờ "hours" làm tròn theo bước 0.5 (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 8.0...).
+- Lý do tăng ca "reason": dùng "${defaultReason}" nếu không ghi lý do riêng.
+
+Hãy trả về kết quả thuần JSON (không bọc trong markdown code block, không thêm văn bản giải thích thừa) theo cấu trúc:
 {
   "entries": [
     {
-      "day": 2,
+      "day": 9,
       "startTime": "16:30",
-      "endTime": "19:30",
-      "hours": 3.0,
+      "endTime": "18:00",
+      "hours": 1.5,
+      "reason": "${defaultReason}"
+    },
+    {
+      "day": 27,
+      "startTime": "07:30",
+      "endTime": "16:30",
+      "hours": 8.0,
       "reason": "${defaultReason}"
     }
   ]
 }
 `
 
-  // Danh sách các model Gemini ưu tiên tốc độ cao nhất (Flash Lite & Flash không delay thinking)
+  // Danh sách các model Gemini ưu tiên nhận diện tốt nhất và tốc độ cao (không delay thinking)
   const modelCandidates = [
-    { name: 'gemini-3.5-flash-lite', disableThinking: false }, // Cực nhanh (~1.5s)
-    { name: 'gemini-3.6-flash', disableThinking: true },       // Tắt thinking budget -> phản hồi ngay trong ~2s
-    { name: 'gemini-flash-lite-latest', disableThinking: false },
-    { name: 'gemini-flash-latest', disableThinking: true }
+    { name: 'gemini-flash-latest', disableThinking: true },
+    { name: 'gemini-3.6-flash', disableThinking: true },
+    { name: 'gemini-3.8-flash', disableThinking: true }
   ]
 
   let lastError = null
@@ -220,7 +250,7 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
       }
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 20000) // Timeout 20s
+      const timeoutId = setTimeout(() => controller.abort(), 12000) // Timeout 12s
 
       const response = await fetch(url, {
         method: 'POST',
@@ -267,9 +297,30 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
           const d = Number(item.day)
           const h = Math.round(Number(item.hours) * 2) / 2 // Làm tròn bước 0.5
           const isSun = sundayDays.includes(d)
-          const defaultStart = isSun ? '07:30' : '16:30'
-          const start = item.startTime || defaultStart
-          const end = item.endTime || ''
+
+          // 1. Giờ bắt đầu: Chủ Nhật là 07:30, Ngày thường luôn là 16:30
+          let start = isSun ? '07:30' : '16:30'
+          if (item.startTime) {
+            let [sh, sm] = item.startTime.split(':').map(Number)
+            if (!isNaN(sh)) {
+              if (!isSun && sh < 12 && sh >= 1) sh += 12 // Khắc phục nếu AI trả về 12h: 04:30 -> 16:30
+              if (isSun && sh > 12) sh = 7 // Phòng ngừa Chủ Nhật
+              const formattedSh = String(sh).padStart(2, '0')
+              const formattedSm = String(isNaN(sm) ? 0 : sm).padStart(2, '0')
+              start = `${formattedSh}:${formattedSm}`
+            }
+          }
+
+          // 2. Giờ kết thúc: Luôn tự động tính tròn theo số giờ (1.5h -> 18:00, 3.5h -> 20:00, 8h CN -> 16:30)
+          let end = calculateEndTimeFromHours(start, h, isSun)
+          if (!end && item.endTime) {
+            let [eh, em] = item.endTime.split(':').map(Number)
+            if (!isNaN(eh)) {
+              if (eh < 12 && eh >= 1) eh += 12 // Khắc phục 06:12 -> 18:12, 04:33 -> 16:33
+              end = `${String(eh).padStart(2, '0')}:${String(isNaN(em) ? 0 : em).padStart(2, '0')}`
+            }
+          }
+
           const itemReason = item.reason?.trim() || defaultReason
 
           return {
