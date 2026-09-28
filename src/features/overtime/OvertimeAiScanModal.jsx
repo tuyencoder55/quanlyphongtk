@@ -653,21 +653,25 @@ export default function OvertimeAiScanModal({
                             </select>
                           </td>
 
-                          {/* Thời gian vào - ra */}
+                          {/* Thời gian vào - ra (Định dạng chuẩn 24h) */}
                           <td className="p-2">
                             <div className="flex items-center gap-1.5">
                               <input
-                                type="time"
+                                type="text"
+                                maxLength={5}
+                                placeholder={item.isSunday ? '07:30' : '16:30'}
                                 value={item.startTime}
                                 onChange={(e) => handleUpdateItem(item.id, 'startTime', e.target.value)}
-                                className="w-[86px] bg-background border border-border/70 rounded-lg px-2 py-1.5 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
+                                className="w-[68px] bg-background border border-border/70 rounded-lg px-1.5 py-1.5 text-xs text-foreground text-center font-mono font-bold outline-none focus:ring-1 focus:ring-primary shadow-xs"
                               />
                               <span className="text-muted-foreground text-xs font-bold">—</span>
                               <input
-                                type="time"
+                                type="text"
+                                maxLength={5}
+                                placeholder={item.isSunday ? '16:30' : '18:00'}
                                 value={item.endTime}
                                 onChange={(e) => handleUpdateItem(item.id, 'endTime', e.target.value)}
-                                className="w-[86px] bg-background border border-border/70 rounded-lg px-2 py-1.5 text-[11px] text-foreground text-center font-mono outline-none focus:ring-1 focus:ring-primary"
+                                className="w-[68px] bg-background border border-border/70 rounded-lg px-1.5 py-1.5 text-xs text-foreground text-center font-mono font-bold outline-none focus:ring-1 focus:ring-primary shadow-xs"
                               />
                             </div>
                           </td>

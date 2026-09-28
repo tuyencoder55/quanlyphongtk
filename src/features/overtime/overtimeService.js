@@ -55,11 +55,11 @@ function removeDetailFromStorage(key) {
 export function calculateOvertimeHours(startTimeStr, endTimeStr, isSunday = false) {
   if (!startTimeStr || !endTimeStr) return 0
 
-  const [startH, startM] = startTimeStr.split(':').map(Number)
-  const [endH, endM] = endTimeStr.split(':').map(Number)
+  const [startH, startM] = String(startTimeStr).replace('h', ':').split(':').map(Number)
+  const [endH, endM] = String(endTimeStr).replace('h', ':').split(':').map(Number)
 
-  const startTotalMinutes = startH * 60 + startM
-  let endTotalMinutes = endH * 60 + endM
+  const startTotalMinutes = (isNaN(startH) ? 0 : startH) * 60 + (isNaN(startM) ? 0 : startM)
+  let endTotalMinutes = (isNaN(endH) ? 0 : endH) * 60 + (isNaN(endM) ? 0 : endM)
 
   // Nếu giờ về qua nửa đêm
   if (endTotalMinutes < startTotalMinutes) {
@@ -87,8 +87,8 @@ export function calculateOvertimeHours(startTimeStr, endTimeStr, isSunday = fals
  */
 export function calculateEndTimeFromHours(startTimeStr, hours, isSunday = false) {
   if (!startTimeStr || !hours) return ''
-  const [startH, startM] = startTimeStr.split(':').map(Number)
-  let totalMinutes = startH * 60 + startM + hours * 60
+  const [startH, startM] = String(startTimeStr).replace('h', ':').split(':').map(Number)
+  let totalMinutes = (isNaN(startH) ? 0 : startH) * 60 + (isNaN(startM) ? 0 : startM) + hours * 60
 
   // Nếu là ca ngày Chủ nhật có trừ giờ trưa (trên 5 tiếng và qua trưa)
   if (isSunday && hours >= 4) {
