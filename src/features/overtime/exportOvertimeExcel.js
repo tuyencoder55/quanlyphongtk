@@ -197,7 +197,7 @@ export async function exportOvertimeToExcel({ period, employee, entries = [], re
       : ''
 
     const rowValues = [
-      i + 1,                                       // Col A: STT
+      entry ? (i + 1) : '',                         // Col A: STT
       entry ? (employee?.employee_code || '') : '', // Col B: MSNV
       entry ? (employee?.full_name || '') : '',     // Col C: Họ và tên
       dateFormatted,                                // Col D: Ngày tăng ca

@@ -228,15 +228,9 @@ export default function OvertimeSheet({
             {/* Các dòng kẻ trống bổ sung để bảng luôn có đủ 19 dòng chuẩn mẫu */}
             {entries.length > 0 && Array.from({ length: emptyRowsCount }).map((_, i) => (
               <tr key={`empty_${i}`}>
-                <td className="border border-black py-0 px-1 text-slate-400 font-normal h-[18px] print:h-[17px]">
-                  {entries.length + i + 1}
-                </td>
-                <td className="border border-black py-0 px-1 font-mono text-slate-400">
-                  {employee?.employee_code}
-                </td>
-                <td className="border border-black py-0 px-1.5 text-left text-slate-400 whitespace-nowrap overflow-hidden">
-                  {employee?.full_name}
-                </td>
+                <td className="border border-black py-0 px-1 h-[18px] print:h-[17px]">&nbsp;</td>
+                <td className="border border-black py-0 px-1">&nbsp;</td>
+                <td className="border border-black py-0 px-1.5 text-left whitespace-nowrap overflow-hidden">&nbsp;</td>
                 <td className="border border-black py-0 px-1">&nbsp;</td>
                 <td className="border border-black py-0 px-1.5">&nbsp;</td>
                 <td className="border border-black py-0 px-1">&nbsp;</td>
