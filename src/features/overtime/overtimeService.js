@@ -117,27 +117,54 @@ export function formatOvertimeTimeString(day, month, year, startTime, endTime) {
 
 /**
  * Lấy danh sách ca tăng ca trong tháng của một nhân viên
- * Nguồn dữ liệu: bảng `timesheet_entries` (lọc row_type = 'overtime' và value_hours > 0)
+ * Nguồn dữ liệu: bảng `timesheet_entries`:
+ * - Ngày thường: lấy các dòng `row_type = 'overtime'`
+ * - Ngày Chủ Nhật: lấy các dòng `row_type = 'work'` (hàng 上班 theo đúng biểu mẫu gốc)
  */
-export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMonth, periodYear, days, department = 'TK') {
+export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMonth, periodYear, days = [], department = 'TK') {
   const { data: entries, error } = await supabase
     .from('timesheet_entries')
     .select('*')
     .eq('period_id', periodId)
     .eq('employee_id', employeeId)
-    .eq('row_type', 'overtime')
     .gt('value_hours', 0)
     .order('day', { ascending: true })
 
   if (error) throw error
 
+  const sundayDays = (days || []).filter((d) => d.isSunday).map((d) => d.day)
+
+  // Lọc các ca tăng ca:
+  // 1. Ngày thường: lấy dòng row_type = 'overtime'
+  // 2. Ngày Chủ Nhật: ưu tiên dòng row_type = 'work' (nếu có cả overtime cũ thì chỉ lấy 1)
+  const entryByDay = new Map()
+
+  for (const entry of (entries || [])) {
+    const isSunday = sundayDays.length > 0 
+      ? sundayDays.includes(entry.day)
+      : (new Date(periodYear, periodMonth - 1, entry.day).getDay() === 0)
+
+    if (isSunday) {
+      if (entry.row_type === 'work' || !entryByDay.has(entry.day)) {
+        entryByDay.set(entry.day, entry)
+      }
+    } else {
+      if (entry.row_type === 'overtime') {
+        entryByDay.set(entry.day, entry)
+      }
+    }
+  }
+
+  const overtimeList = Array.from(entryByDay.values()).sort((a, b) => a.day - b.day)
   const savedDetails = getSavedDetails()
   const defaultReason = getDefaultOvertimeReason(department)
 
   // Ghép chi tiết giờ vào, giờ ra cho từng ngày có tăng ca
-  return (entries || []).map((entry) => {
-    const dayInfo = days.find((d) => d.day === entry.day)
-    const isSunday = dayInfo?.isSunday || false
+  return overtimeList.map((entry) => {
+    const isSunday = sundayDays.length > 0 
+      ? sundayDays.includes(entry.day)
+      : (new Date(periodYear, periodMonth - 1, entry.day).getDay() === 0)
+
     const storageKey = `${periodId}_${employeeId}_${entry.day}`
     const detail = savedDetails[storageKey]
 
@@ -173,7 +200,9 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
 
 /**
  * Lưu hoặc cập nhật một ca tăng ca
- * Tự động đồng bộ sang bảng timesheet_entries với row_type = 'overtime'
+ * - Ngày thường: lưu vào dòng `overtime` (加班)
+ * - Ngày Chủ Nhật: lưu vào dòng `work` (上班) theo đúng chuẩn biểu mẫu gốc,
+ *   đồng thời reset dòng `overtime` về 0 để không bị trùng lặp ở dưới.
  */
 export async function saveOvertimeEntry({
   periodId,
@@ -183,12 +212,31 @@ export async function saveOvertimeEntry({
   startTime,
   endTime,
   reason,
-  department = 'TK'
+  department = 'TK',
+  isSunday
 }) {
   const dayNum = Number(day)
   const hoursNum = Number(hours)
   const defaultReason = getDefaultOvertimeReason(department)
   const finalReason = reason?.trim() || defaultReason
+
+  // Xác định ngày có phải Chủ Nhật hay không nếu chưa truyền vào
+  let isSun = isSunday
+  if (typeof isSun !== 'boolean') {
+    const { data: periodData } = await supabase
+      .from('timesheet_periods')
+      .select('month, year')
+      .eq('id', periodId)
+      .single()
+    if (periodData) {
+      isSun = new Date(periodData.year, periodData.month - 1, dayNum).getDay() === 0
+    } else {
+      isSun = false
+    }
+  }
+
+  // Ngày CN lưu vào dòng work (上班), ngày thường lưu vào dòng overtime (加班)
+  const targetRowType = isSun ? 'work' : 'overtime'
 
   // 1. Kiểm tra xem ô ngày này trong timesheet_entries đã có chưa
   const { data: existing } = await supabaseAdmin
@@ -196,7 +244,7 @@ export async function saveOvertimeEntry({
     .select('id')
     .eq('period_id', periodId)
     .eq('employee_id', employeeId)
-    .eq('row_type', 'overtime')
+    .eq('row_type', targetRowType)
     .eq('day', dayNum)
     .single()
 
@@ -218,7 +266,7 @@ export async function saveOvertimeEntry({
       .insert({
         period_id: periodId,
         employee_id: employeeId,
-        row_type: 'overtime',
+        row_type: targetRowType,
         day: dayNum,
         value_hours: hoursNum
       })
@@ -226,7 +274,21 @@ export async function saveOvertimeEntry({
     if (insertErr) throw insertErr
   }
 
-  // 2. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage
+  // 2. Nếu là Chủ Nhật, đảm bảo ô dòng overtime (加班) được reset về 0 (tránh lưu đè/lẫn ở dưới)
+  if (isSun) {
+    await supabaseAdmin
+      .from('timesheet_entries')
+      .update({
+        value_hours: 0,
+        updated_at: new Date().toISOString()
+      })
+      .eq('period_id', periodId)
+      .eq('employee_id', employeeId)
+      .eq('row_type', 'overtime')
+      .eq('day', dayNum)
+  }
+
+  // 3. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage
   const storageKey = `${periodId}_${employeeId}_${dayNum}`
   saveDetailToStorage(storageKey, {
     startTime,
@@ -239,11 +301,39 @@ export async function saveOvertimeEntry({
 
 /**
  * Xoá một ca tăng ca
- * Cập nhật số giờ về 0 trong timesheet_entries và xoá chi tiết trong localStorage
+ * - Nếu là Chủ Nhật: reset dòng `work` về 0 (và cả dòng `overtime` nếu có)
+ * - Nếu là ngày thường: reset dòng `overtime` về 0
  */
-export async function deleteOvertimeEntry(periodId, employeeId, day) {
+export async function deleteOvertimeEntry(periodId, employeeId, day, isSunday) {
   const dayNum = Number(day)
 
+  let isSun = isSunday
+  if (typeof isSun !== 'boolean') {
+    const { data: periodData } = await supabase
+      .from('timesheet_periods')
+      .select('month, year')
+      .eq('id', periodId)
+      .single()
+    if (periodData) {
+      isSun = new Date(periodData.year, periodData.month - 1, dayNum).getDay() === 0
+    }
+  }
+
+  // Nếu là Chủ Nhật, reset cả dòng work
+  if (isSun) {
+    await supabaseAdmin
+      .from('timesheet_entries')
+      .update({
+        value_hours: 0,
+        updated_at: new Date().toISOString()
+      })
+      .eq('period_id', periodId)
+      .eq('employee_id', employeeId)
+      .eq('row_type', 'work')
+      .eq('day', dayNum)
+  }
+
+  // Luôn reset dòng overtime về 0
   const { data, error } = await supabaseAdmin
     .from('timesheet_entries')
     .update({
@@ -295,7 +385,8 @@ export async function quickClockOutToday(periodId, employeeId, isSunday = false,
     startTime: defaultStartTime,
     endTime: roundedEndTime,
     reason: defaultReason,
-    department
+    department,
+    isSunday
   })
 
   return {

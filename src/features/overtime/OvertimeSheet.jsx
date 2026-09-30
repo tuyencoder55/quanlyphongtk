@@ -126,31 +126,31 @@ export default function OvertimeSheet({
         <table className="w-full border-collapse border border-black text-[7pt] leading-none text-center">
           <thead>
             <tr className="bg-slate-50 print:bg-transparent font-bold">
-              <th className="border border-black px-1 py-0.5 w-8">
+              <th className="border border-black px-1 py-0.5 w-[5%]">
                 <div>STT</div>
                 <div className="text-[6pt] font-normal text-slate-600">序号</div>
               </th>
-              <th className="border border-black px-1 py-0.5 w-16">
+              <th className="border border-black px-1 py-0.5 w-[9%]">
                 <div>MSNV</div>
                 <div className="text-[6pt] font-normal text-slate-600">工号</div>
               </th>
-              <th className="border border-black px-1.5 py-0.5 w-36 text-left">
+              <th className="border border-black px-1.5 py-0.5 w-[28%] text-left">
                 <div>Họ và tên</div>
                 <div className="text-[6pt] font-normal text-slate-600">姓名</div>
               </th>
-              <th className="border border-black px-1 py-0.5 w-24">
+              <th className="border border-black px-1 py-0.5 w-[15%]">
                 <div>Ngày tăng ca</div>
                 <div className="text-[6pt] font-normal text-slate-600">日期</div>
               </th>
-              <th className="border border-black px-1.5 py-0.5">
+              <th className="border border-black px-1 py-0.5 w-[22%]">
                 <div>Thời gian (时间)</div>
-                <div className="text-[6pt] font-normal text-slate-600">(Từ ......giờ ......đến...... giờ ......)</div>
+                <div className="text-[5.5pt] font-normal text-slate-600 leading-tight">(Từ ...h ... đến ...h ...)</div>
               </th>
-              <th className="border border-black px-1 py-0.5 w-14">
+              <th className="border border-black px-1 py-0.5 w-[8%]">
                 <div>Tổng giờ</div>
                 <div className="text-[6pt] font-normal text-slate-600">总时间</div>
               </th>
-              <th className="border border-black px-1 py-0.5 w-24">
+              <th className="border border-black px-1 py-0.5 w-[13%]">
                 <div>Nhân viên ký tên</div>
                 <div className="text-[6pt] font-normal text-slate-600">申请人签名</div>
               </th>
@@ -172,7 +172,7 @@ export default function OvertimeSheet({
                   <td className="border border-black py-0 px-1 font-mono font-bold">
                     {employee?.employee_code}
                   </td>
-                  <td className="border border-black py-0 px-1.5 text-left font-bold tracking-tight truncate">
+                  <td className="border border-black py-0 px-1.5 text-left font-bold tracking-tight whitespace-nowrap overflow-hidden">
                     {employee?.full_name}
                   </td>
                   <td className="border border-black py-0 px-1 font-mono font-medium text-center">
@@ -204,7 +204,7 @@ export default function OvertimeSheet({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              onDeleteEntry?.(entry.day)
+                              onDeleteEntry?.(entry.day, entry.isSunday)
                             }}
                             title={`Xoá ca ngày ${entry.day}`}
                             className="p-0.5 rounded hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors"
@@ -234,7 +234,7 @@ export default function OvertimeSheet({
                 <td className="border border-black py-0 px-1 font-mono text-slate-400">
                   {employee?.employee_code}
                 </td>
-                <td className="border border-black py-0 px-1.5 text-left text-slate-400 truncate">
+                <td className="border border-black py-0 px-1.5 text-left text-slate-400 whitespace-nowrap overflow-hidden">
                   {employee?.full_name}
                 </td>
                 <td className="border border-black py-0 px-1">&nbsp;</td>

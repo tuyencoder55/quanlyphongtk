@@ -71,7 +71,8 @@ export default function OvertimeModal({
       hours: Number(hours),
       startTime,
       endTime: roundedEndTime,
-      reason: reason.trim() || defaultDeptReason
+      reason: reason.trim() || defaultDeptReason,
+      isSunday
     })
   }
 
@@ -206,7 +207,7 @@ export default function OvertimeModal({
             {initialData && onDelete ? (
               <button
                 type="button"
-                onClick={() => onDelete(initialData.day)}
+                onClick={() => onDelete(initialData.day, isSunday)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-destructive/15 text-destructive hover:bg-destructive hover:text-white transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />

@@ -44,13 +44,13 @@ export async function exportOvertimeToExcel({ period, employee, entries = [], re
 
   // Đặt độ rộng 7 cột chuẩn theo file gốc
   ws.columns = [
-    { key: 'stt', width: 8 },      // Col A: STT
+    { key: 'stt', width: 6 },      // Col A: STT
     { key: 'msnv', width: 12 },    // Col B: MSNV
-    { key: 'name', width: 27 },    // Col C: Họ và tên
+    { key: 'name', width: 32 },    // Col C: Họ và tên
     { key: 'date', width: 15 },    // Col D: Ngày tăng ca
-    { key: 'time', width: 28 },    // Col E: Thời gian
-    { key: 'hours', width: 14 },   // Col F: Tổng giờ
-    { key: 'sign', width: 21 },    // Col G: Nhân viên ký tên
+    { key: 'time', width: 22 },    // Col E: Thời gian
+    { key: 'hours', width: 12 },   // Col F: Tổng giờ
+    { key: 'sign', width: 18 },    // Col G: Nhân viên ký tên
   ]
 
   // Đặt chiều cao các dòng tiêu đề

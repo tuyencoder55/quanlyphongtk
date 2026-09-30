@@ -311,7 +311,8 @@ export default function OvertimeAiScanModal({
             startTime: item.startTime,
             endTime: item.endTime,
             reason: item.reason,
-            department: employee?.department || 'TK'
+            department: employee?.department || 'TK',
+            isSunday: item.isSunday
           })
           successCount++
         } catch (err) {

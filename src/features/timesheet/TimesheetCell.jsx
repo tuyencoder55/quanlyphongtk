@@ -26,12 +26,21 @@ export default function TimesheetCell({
   // Tra cứu loại phép hiện tại
   const currentLeaveType = leaveCode ? leaveTypes.find((lt) => lt.code === leaveCode) : null
 
+  const [customHours, setCustomHours] = useState('')
+
+  // Cập nhật customHours khi mở popover
+  useEffect(() => {
+    if (isOpen) {
+      setCustomHours(valueHours > 0 ? String(valueHours) : '')
+    }
+  }, [isOpen, valueHours])
+
   // Tính toán toạ độ thông minh: Luôn nằm trọn vẹn trong viewport màn hình (không bao giờ tràn đỉnh hay đáy)
   useEffect(() => {
     if (isOpen && cellRef.current) {
       const rect = cellRef.current.getBoundingClientRect()
-      const popoverWidth = rowType === 'work' ? 510 : 280
-      const popoverHeight = rowType === 'work' ? 280 : 180
+      const popoverWidth = isSunday ? 360 : (rowType === 'work' ? 510 : 280)
+      const popoverHeight = isSunday ? 320 : (rowType === 'work' ? 280 : 180)
 
       const spaceAbove = rect.top
       const spaceBelow = window.innerHeight - rect.bottom
@@ -59,7 +68,7 @@ export default function TimesheetCell({
 
       setPopoverCoords({ top: finalTop, left: finalLeft })
     }
-  }, [isOpen, rowType])
+  }, [isOpen, rowType, isSunday])
 
   // Đóng popover khi click ra ngoài
   useEffect(() => {
@@ -81,18 +90,33 @@ export default function TimesheetCell({
     }
   }, [isOpen])
 
-  // Xử lý chọn nhanh
-  const handleQuickSelect = (newValHours, newLeaveCode, newLeaveHours) => {
+  // Xử lý chọn nhanh (hỗ trợ lưu sang rowType khác nếu là ngày Chủ Nhật)
+  const handleQuickSelect = (newValHours, newLeaveCode, newLeaveHours, targetRowType = rowType) => {
     onSave({
-      entryId: entry?.id,
+      entryId: targetRowType === rowType ? entry?.id : undefined,
       periodId,
       employeeId,
-      rowType,
+      rowType: targetRowType,
       day,
       valueHours: newValHours,
       leaveCode: newLeaveCode,
       leaveHours: newLeaveHours,
     })
+
+    // Nếu đang ở hàng overtime ngày Chủ Nhật mà chọn điền lên hàng work, đồng thời dọn sạch ô overtime này về 0
+    if (rowType === 'overtime' && targetRowType === 'work' && valueHours > 0) {
+      onSave({
+        entryId: entry?.id,
+        periodId,
+        employeeId,
+        rowType: 'overtime',
+        day,
+        valueHours: 0,
+        leaveCode: null,
+        leaveHours: 0,
+      })
+    }
+
     setIsOpen(false)
   }
 
@@ -206,7 +230,7 @@ function getContrastTextColor(hexColor) {
         <div
           ref={popoverRef}
           className={`fixed z-50 ${
-            rowType === 'work' ? 'w-[510px]' : 'w-[280px]'
+            isSunday ? 'w-[360px]' : (rowType === 'work' ? 'w-[510px]' : 'w-[280px]')
           } max-w-[96vw] bg-card/95 backdrop-blur-xl border border-border/90 rounded-2xl shadow-2xl p-3.5 text-xs text-foreground animate-popup-smooth`}
           style={{
             top: popoverCoords.top,
@@ -217,11 +241,11 @@ function getContrastTextColor(hexColor) {
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/70">
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-foreground text-xs">
-                Ngày {String(day).padStart(2, '0')}
+                Ngày {String(day).padStart(2, '0')} {isSunday ? '(Chủ Nhật)' : ''}
               </span>
               <span className="text-muted-foreground">•</span>
               <span className="font-semibold text-xs text-primary">
-                {rowType === 'work' ? 'Giờ Công & Phép (上班)' : 'Tăng Ca (加班)'}
+                {rowType === 'work' ? 'Hàng Đi Làm (上班)' : 'Hàng Tăng Ca (加班)'}
               </span>
             </div>
             <button
@@ -232,8 +256,146 @@ function getContrastTextColor(hexColor) {
             </button>
           </div>
 
-          {/* Menu cho hàng Đi làm (work) */}
-          {rowType === 'work' && (
+          {/* 1. MENU NGÀY CHỦ NHẬT - HÀNG ĐI LÀM (work - 上班) */}
+          {rowType === 'work' && isSunday && (
+            <div className="space-y-2.5">
+              <div className="p-2 bg-sky-500/10 border border-sky-500/30 rounded-xl text-[11px] text-sky-300 font-medium">
+                ✨ Công làm việc ngày Chủ Nhật tính vào cột <b>Tổng ngày CN</b> ở hàng <b>上班</b> này.
+              </div>
+
+              {/* Nút 8h Đi làm cả ngày Chủ Nhật */}
+              <button
+                type="button"
+                onClick={() => handleQuickSelect(8, null, 0)}
+                className="w-full py-2 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 rounded-xl text-left font-bold transition-all flex items-center justify-between group shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs text-emerald-300 font-extrabold">
+                    8h Đi Làm Cả Ngày (Chủ Nhật)
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  8h CN
+                </span>
+              </button>
+
+              {/* Các mốc giờ nhanh: 2h, 3h, 4h, 5h, 6h, 7h, 7.5h, 8h */}
+              <div>
+                <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1 px-0.5">
+                  Chọn nhanh số giờ làm CN
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 text-center font-bold">
+                  {[2, 3, 4, 5, 6, 7, 7.5, 8].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => handleQuickSelect(h, null, 0)}
+                      className={`py-1.5 px-1 rounded-xl text-xs font-bold border transition-all ${
+                        valueHours === h 
+                          ? 'bg-primary text-white border-primary shadow-sm' 
+                          : 'bg-secondary/60 hover:bg-secondary text-foreground border-border/60 hover:border-primary/50'
+                      }`}
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nhập số giờ tùy ý */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const val = Number(customHours)
+                  if (!isNaN(val) && val >= 0 && val <= 24) {
+                    handleQuickSelect(val, null, 0)
+                  }
+                }}
+                className="flex items-center gap-1.5 pt-1.5 border-t border-border/60"
+              >
+                <span className="text-[11px] text-muted-foreground font-medium shrink-0">
+                  Giờ khác:
+                </span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="24"
+                  placeholder="Ví dụ: 7.5"
+                  value={customHours}
+                  onChange={(e) => setCustomHours(e.target.value)}
+                  className="flex-1 px-2.5 py-1 bg-secondary/80 border border-border/80 rounded-lg text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1 bg-primary text-primary-foreground font-bold rounded-lg text-xs hover:bg-primary/90 transition-colors"
+                >
+                  Lưu
+                </button>
+              </form>
+
+              {/* Footer: Xoá */}
+              <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-xs px-0.5">
+                <span className="text-[10px] text-muted-foreground">Không làm thì để trống</span>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSelect(0, null, 0)}
+                  className="text-[11px] text-muted-foreground hover:text-rose-400 py-0.5 transition-colors font-medium"
+                >
+                  Xoá ô (0h / Nghỉ)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. MENU NGÀY CHỦ NHẬT - HÀNG TĂNG CA (overtime - 加班) */}
+          {rowType === 'overtime' && isSunday && (
+            <div className="space-y-2.5">
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-200">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Quy định biểu mẫu:</span>
+                </div>
+                <p className="text-[11px] text-amber-200/90 leading-tight">
+                  Công ngày Chủ Nhật được điền vào hàng ở trên (<b>上班</b>), không điền vào hàng 加班.
+                </p>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1 px-0.5">
+                  Chọn giờ để điền vào hàng trên (上班):
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 text-center font-bold">
+                  {[2, 3, 4, 5, 6, 7, 7.5, 8].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => handleQuickSelect(h, null, 0, 'work')}
+                      className="py-1.5 px-1 bg-secondary/60 hover:bg-emerald-600 hover:text-white border border-border/60 hover:border-emerald-500 rounded-xl transition-all shadow-xs text-xs"
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Xoá ô overtime hiện tại nếu đang có giờ */}
+              <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs px-0.5">
+                <span className="text-[10px] text-muted-foreground">Hàng này nên để trống</span>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSelect(0, null, 0, 'overtime')}
+                  className="text-[11px] text-muted-foreground hover:text-rose-400 py-0.5 transition-colors font-medium"
+                >
+                  Xoá ô này (0h)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 3. MENU NGÀY THƯỜNG - HÀNG ĐI LÀM (work - 上班) */}
+          {rowType === 'work' && !isSunday && (
             <div className="space-y-2.5">
               {/* Nút 8h đi làm bình thường (Nổi bật, sang trọng) */}
               <button
@@ -356,8 +518,8 @@ function getContrastTextColor(hexColor) {
             </div>
           )}
 
-          {/* Menu cho hàng Tăng ca (overtime) */}
-          {rowType === 'overtime' && (
+          {/* 4. MENU NGÀY THƯỜNG - HÀNG TĂNG CA (overtime - 加班) */}
+          {rowType === 'overtime' && !isSunday && (
             <div className="space-y-2.5">
               <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-0.5">
                 Chọn số giờ tăng ca
