@@ -45,7 +45,7 @@ export default function MealReportSheet({
           每天报饭报表
         </div>
         <div className="font-bold text-xs text-black mt-0.5 uppercase tracking-wide">
-          BỘ PHẬN : {deptDisplayName}
+          BỘ PHẬN : THIẾT KẾ
         </div>
       </div>
 

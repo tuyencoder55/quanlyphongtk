@@ -25,7 +25,7 @@ export default function MealReportPage() {
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
-  const [department, setDepartment] = useState('TK') // 'TK' hoặc 'CTP'
+  const department = 'TK' // Cố định Bộ phận Thiết Kế theo biểu mẫu
 
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -228,35 +228,6 @@ export default function MealReportPage() {
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-        </div>
-
-        {/* Lọc bộ phận */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground font-medium">Bộ phận:</span>
-          <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-xl border border-border/60">
-            <button
-              type="button"
-              onClick={() => setDepartment('TK')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                department === 'TK'
-                  ? 'bg-card text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Thiết Kế (TK)
-            </button>
-            <button
-              type="button"
-              onClick={() => setDepartment('CTP')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                department === 'CTP'
-                  ? 'bg-card text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              CTP
-            </button>
-          </div>
         </div>
 
         {/* Ghi chú hướng dẫn nhỏ */}
