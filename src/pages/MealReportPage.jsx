@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { supabase } from '@/lib/supabase'
 import {
@@ -11,7 +11,6 @@ import {
   UtensilsCrossed,
   Printer,
   FileSpreadsheet,
-  Save,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -34,7 +33,9 @@ export default function MealReportPage() {
 
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
+  const isLoadedRef = useRef(false)
+
   const [activeHeadcount, setActiveHeadcount] = useState(14)
   const [isQuickFillOpen, setIsQuickFillOpen] = useState(false)
   const [quickPeopleCount, setQuickPeopleCount] = useState(14)
@@ -64,9 +65,12 @@ export default function MealReportPage() {
   // 2. Tải dữ liệu biểu báo cơm
   const loadData = useCallback(async () => {
     setLoading(true)
+    isLoadedRef.current = false
     try {
       const data = await getMealReport(selectedMonth, selectedYear, department)
       setEntries(data)
+      isLoadedRef.current = true
+      setSaveStatus('saved')
     } catch (err) {
       toast.error('Lỗi tải biểu báo cơm: ' + err.message)
     } finally {
@@ -78,7 +82,25 @@ export default function MealReportPage() {
     loadData()
   }, [loadData])
 
-  // 3. Xử lý khi Admin nhập ô
+  // 3. Tự Động Lưu (Auto-Save) ngầm như Google Sheets mỗi khi nhập liệu
+  useEffect(() => {
+    if (!isLoadedRef.current || !canEdit || entries.length === 0) return
+
+    setSaveStatus('saving')
+    const timer = setTimeout(async () => {
+      try {
+        await saveMealReport(selectedMonth, selectedYear, entries, department)
+        setSaveStatus('saved')
+      } catch (err) {
+        console.warn('Lỗi tự động lưu biểu báo cơm:', err)
+        setSaveStatus('saved')
+      }
+    }, 600)
+
+    return () => clearTimeout(timer)
+  }, [entries, selectedMonth, selectedYear, department, canEdit])
+
+  // 4. Xử lý khi Admin nhập ô
   const handleChangeEntry = (day, field, value) => {
     const numVal = Math.max(0, parseInt(value, 10) || 0)
 
@@ -99,19 +121,6 @@ export default function MealReportPage() {
         return updated
       })
     )
-  }
-
-  // 4. Lưu biểu báo cơm
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await saveMealReport(selectedMonth, selectedYear, entries, department)
-      toast.success('Đã lưu dữ liệu biểu báo cơm thành công!')
-    } catch (err) {
-      toast.error('Lỗi lưu biểu báo cơm: ' + err.message)
-    } finally {
-      setSaving(false)
-    }
   }
 
   // 5. Điền nhanh quân số cho cả tháng
@@ -139,7 +148,7 @@ export default function MealReportPage() {
       })
     )
     setIsQuickFillOpen(false)
-    toast.success(`Đã điền nhanh ${targetPeople} người cho ${applySundays ? 'toàn bộ tháng' : 'ngày thường (T2 - T7)'}!`)
+    toast.success(`Đã điền nhanh ${targetPeople} người (tự động lưu)!`)
   }
 
   // 6. Tự động tính lại cơm Trưa = Tổng số người - Vắng cho toàn bộ ngày
@@ -227,19 +236,20 @@ export default function MealReportPage() {
                 <span>Tính cơm trưa</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/25 transition-all disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {/* Trạng thái Tự Động Lưu ngầm (như Google Docs / Google Sheets) */}
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/60 border border-border/60 text-xs">
+                {saveStatus === 'saving' ? (
+                  <span className="inline-flex items-center gap-1.5 text-muted-foreground animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <span>Đang lưu...</span>
+                  </span>
                 ) : (
-                  <Save className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Đã tự động lưu</span>
+                  </span>
                 )}
-                <span>Lưu biểu</span>
-              </button>
+              </div>
             </>
           )}
 
