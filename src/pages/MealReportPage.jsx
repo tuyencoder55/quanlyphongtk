@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
-import { supabase } from '@/lib/supabase'
 import {
   getMealReport,
   saveMealReport,
@@ -13,10 +12,7 @@ import {
   FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
-  Zap,
-  RotateCcw,
   Check,
-  Calculator,
   Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -36,33 +32,7 @@ export default function MealReportPage() {
   const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
   const isLoadedRef = useRef(false)
 
-  const [activeHeadcount, setActiveHeadcount] = useState(14)
-  const [isQuickFillOpen, setIsQuickFillOpen] = useState(false)
-  const [quickPeopleCount, setQuickPeopleCount] = useState(14)
-
-  // 1. Tải số lượng nhân viên thực tế của bộ phận để gợi ý
-  useEffect(() => {
-    async function loadDepartmentCount() {
-      try {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('status', 'active')
-          .eq('department', department)
-
-        if (!error && data) {
-          const count = data.length || 14
-          setActiveHeadcount(count)
-          setQuickPeopleCount(count)
-        }
-      } catch (err) {
-        console.warn('Không tải được danh sách nhân viên:', err)
-      }
-    }
-    loadDepartmentCount()
-  }, [department])
-
-  // 2. Tải dữ liệu biểu báo cơm
+  // 1. Tải dữ liệu biểu báo cơm
   const loadData = useCallback(async () => {
     setLoading(true)
     isLoadedRef.current = false
@@ -82,7 +52,7 @@ export default function MealReportPage() {
     loadData()
   }, [loadData])
 
-  // 3. Tự Động Lưu (Auto-Save) ngầm như Google Sheets mỗi khi nhập liệu
+  // 2. Tự Động Lưu (Auto-Save) ngầm như Google Sheets mỗi khi nhập liệu
   useEffect(() => {
     if (!isLoadedRef.current || !canEdit || entries.length === 0) return
 
@@ -100,7 +70,7 @@ export default function MealReportPage() {
     return () => clearTimeout(timer)
   }, [entries, selectedMonth, selectedYear, department, canEdit])
 
-  // 4. Xử lý khi Admin nhập ô
+  // 3. Xử lý khi Admin nhập ô
   const handleChangeEntry = (day, field, value) => {
     const numVal = Math.max(0, parseInt(value, 10) || 0)
 
@@ -123,46 +93,7 @@ export default function MealReportPage() {
     )
   }
 
-  // 5. Điền nhanh quân số cho cả tháng
-  const handleApplyQuickFill = (applySundays = false) => {
-    const targetPeople = Number(quickPeopleCount) || 14
-    setEntries((prev) =>
-      prev.map((row) => {
-        if (row.isSunday && !applySundays) {
-          return {
-            ...row,
-            total_people: 0,
-            absent_count: 0,
-            lunch_count: 0,
-            dinner_count: 0
-          }
-        }
-        const total = targetPeople
-        const absent = row.absent_count || 0
-        const lunch = Math.max(0, total - absent)
-        return {
-          ...row,
-          total_people: total,
-          lunch_count: lunch
-        }
-      })
-    )
-    setIsQuickFillOpen(false)
-    toast.success(`Đã điền nhanh ${targetPeople} người (tự động lưu)!`)
-  }
-
-  // 6. Tự động tính lại cơm Trưa = Tổng số người - Vắng cho toàn bộ ngày
-  const handleRecalculateLunch = () => {
-    setEntries((prev) =>
-      prev.map((row) => ({
-        ...row,
-        lunch_count: Math.max(0, (Number(row.total_people) || 0) - (Number(row.absent_count) || 0))
-      }))
-    )
-    toast.success('Đã tính lại cột Cơm Trưa = Tổng số người - Vắng!')
-  }
-
-  // 7. Xuất file Excel
+  // 4. Xuất file Excel
   const handleExportExcel = async () => {
     try {
       await exportMealReportExcel(selectedMonth, selectedYear, entries, department)
@@ -172,7 +103,7 @@ export default function MealReportPage() {
     }
   }
 
-  // 8. Chuyển tháng trước / sau
+  // 5. Chuyển tháng trước / sau
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
       setSelectedMonth(12)
@@ -215,42 +146,19 @@ export default function MealReportPage() {
         {/* Nút thao tác chính */}
         <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsQuickFillOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border/70 shadow-xs transition-colors"
-                title="Tự động điền nhanh quân số cho ngày thường"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-500" />
-                <span>Điền nhanh quân số</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRecalculateLunch}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border/70 shadow-xs transition-colors"
-                title="Tính lại Trưa = Tổng - Vắng"
-              >
-                <Calculator className="w-3.5 h-3.5 text-blue-500" />
-                <span>Tính cơm trưa</span>
-              </button>
-
-              {/* Trạng thái Tự Động Lưu ngầm (như Google Docs / Google Sheets) */}
-              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/60 border border-border/60 text-xs">
-                {saveStatus === 'saving' ? (
-                  <span className="inline-flex items-center gap-1.5 text-muted-foreground animate-pulse">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                    <span>Đang lưu...</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Đã tự động lưu</span>
-                  </span>
-                )}
-              </div>
-            </>
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/60 border border-border/60 text-xs">
+              {saveStatus === 'saving' ? (
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <span>Đang lưu...</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Đã tự động lưu</span>
+                </span>
+              )}
+            </div>
           )}
 
           <button
@@ -361,65 +269,7 @@ export default function MealReportPage() {
         </div>
       </div>
 
-      {/* 3. MODAL ĐIỀN NHANH QUÂN SỐ */}
-      {isQuickFillOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-card border border-border rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>Điền nhanh quân số hằng ngày</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Tự động áp dụng quân số cho các ngày trong tháng để không phải nhập tay từng ô:
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Số người đi làm mỗi ngày:
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={quickPeopleCount}
-                  onChange={(e) => setQuickPeopleCount(Number(e.target.value))}
-                  className="w-24 px-3 py-2 bg-secondary border border-border rounded-xl font-bold font-mono text-center text-sm outline-none focus:ring-2 focus:ring-primary"
-                />
-                <span className="text-xs text-muted-foreground">người (Hiện có {activeHeadcount} người active)</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                type="button"
-                onClick={() => handleApplyQuickFill(false)}
-                className="w-full py-2 px-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-all shadow-sm"
-              >
-                Áp dụng cho Ngày Thường (T2 — T7, Chủ Nhật = 0)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleApplyQuickFill(true)}
-                className="w-full py-2 px-3 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition-all border border-border/70"
-              >
-                Áp dụng cho Tất Cả Các Ngày (bao gồm CN)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsQuickFillOpen(false)}
-                className="w-full py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. SHEET BIỂU BÁO CƠM CHÍNH */}
+      {/* 3. SHEET BIỂU BÁO CƠM CHÍNH */}
       {loading ? (
         <div className="bg-card border border-border rounded-2xl p-16 flex flex-col items-center justify-center gap-3 text-muted-foreground">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
