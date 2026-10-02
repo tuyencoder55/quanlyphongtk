@@ -16,7 +16,8 @@ import {
   Shield,
   ShieldCheck,
   Layers,
-  KeyRound
+  KeyRound,
+  UtensilsCrossed
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SelfChangePasswordModal from '@/features/users/SelfChangePasswordModal'
@@ -62,6 +63,11 @@ export default function Layout({ children }) {
       name: 'Đề Nghị Tăng Ca',
       path: '/overtime',
       icon: Clock,
+    },
+    {
+      name: 'Biểu Báo Cơm',
+      path: '/meal-report',
+      icon: UtensilsCrossed,
     },
     ...(isAdmin ? [
       {

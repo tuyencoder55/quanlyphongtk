@@ -8,6 +8,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import EmployeesPage from '@/pages/EmployeesPage'
 import TimesheetPage from '@/pages/TimesheetPage'
 import OvertimePage from '@/pages/OvertimePage'
+import MealReportPage from '@/pages/MealReportPage'
 import UsersPage from '@/pages/UsersPage'
 import { Loader2 } from 'lucide-react'
 
@@ -105,6 +106,16 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <OvertimePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/meal-report"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <MealReportPage />
               </Layout>
             </ProtectedRoute>
           }

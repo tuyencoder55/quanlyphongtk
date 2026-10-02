@@ -154,3 +154,25 @@ create policy "entries_write" on timesheet_entries for all using (
 -- Policies cho OVERTIME_ENTRIES
 create policy "overtime_select" on overtime_entries for select using (auth.role() = 'authenticated');
 create policy "overtime_write" on overtime_entries for all using (can_user_edit()) with check (can_user_edit());
+
+-- 6. BẢNG MEAL_ENTRIES (Biểu báo cơm hàng ngày)
+create table if not exists meal_entries (
+  id uuid primary key default gen_random_uuid(),
+  month int not null check (month between 1 and 12),
+  year int not null check (year >= 2000),
+  day int not null check (day between 1 and 31),
+  total_people int not null default 0,  -- 实际上班人员 / TỔNG SỐ NGƯỜI
+  absent_count int not null default 0,  -- 请假 / VẮNG
+  lunch_count int not null default 0,   -- 中午 / TRƯA
+  dinner_count int not null default 0,  -- 下午 / CHIỀU
+  department text not null default 'TK', -- Bộ phận: TK (Thiết Kế), CTP...
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (month, year, day, department)
+);
+
+create index if not exists idx_meal_entries_month_year on meal_entries(month, year, department);
+alter table meal_entries enable row level security;
+create policy "meal_entries_select" on meal_entries for select using (auth.role() = 'authenticated');
+create policy "meal_entries_write" on meal_entries for all using (can_user_edit()) with check (can_user_edit());
