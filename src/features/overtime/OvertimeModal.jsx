@@ -44,11 +44,72 @@ export default function OvertimeModal({
     }
   }, [day, isSunday, initialData])
 
+  // Chuẩn hoá chuỗi thời gian nhập từ bàn phím (hỗ trợ 1830, 18.30, 18h30, 18 -> 18:00)
+  const normalizeTimeInput = (val) => {
+    if (!val) return ''
+    let cleaned = String(val).trim().toLowerCase().replace('h', ':').replace('.', ':')
+
+    // Nếu gõ 3-4 chữ số liền (1830 -> 18:30, 730 -> 07:30)
+    if (/^\d{3,4}$/.test(cleaned)) {
+      if (cleaned.length === 3) cleaned = '0' + cleaned
+      const h = Math.min(23, Math.max(0, Number(cleaned.slice(0, 2))))
+      const m = Math.min(59, Math.max(0, Number(cleaned.slice(2, 4))))
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+
+    // Nếu chỉ gõ 1-2 chữ số (ví dụ 18 -> 18:00, 7 -> 07:00)
+    if (/^\d{1,2}$/.test(cleaned)) {
+      const h = Math.min(23, Math.max(0, Number(cleaned)))
+      return `${String(h).padStart(2, '0')}:00`
+    }
+
+    // Nếu có dấu hai chấm : (ví dụ 7:30 -> 07:30)
+    if (cleaned.includes(':')) {
+      const [rawH, rawM] = cleaned.split(':')
+      const h = Math.min(23, Math.max(0, Number(rawH) || 0))
+      const m = Math.min(59, Math.max(0, Number(rawM) || 0))
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+
+    return cleaned
+  }
+
+  // Xử lý khi rời ô nhập giờ (Blur) để format đẹp lại
+  const handleBlurTime = (type) => {
+    if (type === 'start') {
+      const formatted = normalizeTimeInput(startTime)
+      if (formatted && formatted !== startTime) {
+        setStartTime(formatted)
+      }
+      if (!manualHours && formatted && endTime) {
+        const normEnd = normalizeTimeInput(endTime) || endTime
+        const computed = calculateOvertimeHours(formatted, normEnd, isSunday)
+        setHours(computed)
+      }
+    } else {
+      const formatted = normalizeTimeInput(endTime)
+      if (formatted && formatted !== endTime) {
+        setEndTime(formatted)
+      }
+      if (!manualHours && startTime && formatted) {
+        const normStart = normalizeTimeInput(startTime) || startTime
+        const computed = calculateOvertimeHours(normStart, formatted, isSunday)
+        setHours(computed)
+      }
+    }
+  }
+
   // Tự động tính số giờ khi đổi giờ vào hoặc giờ ra
   useEffect(() => {
     if (!manualHours && startTime && endTime) {
-      const computed = calculateOvertimeHours(startTime, endTime, isSunday)
-      setHours(computed)
+      const normStart = normalizeTimeInput(startTime)
+      const normEnd = normalizeTimeInput(endTime)
+      if (normStart.includes(':') && normEnd.includes(':') && normEnd.length >= 4) {
+        const computed = calculateOvertimeHours(normStart, normEnd, isSunday)
+        if (computed > 0) {
+          setHours(computed)
+        }
+      }
     }
   }, [startTime, endTime, isSunday, manualHours])
 
@@ -56,20 +117,28 @@ export default function OvertimeModal({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (Number(hours) <= 0) {
+
+    const finalStart = normalizeTimeInput(startTime) || startTime
+    const finalEnd = normalizeTimeInput(endTime) || endTime
+
+    const computedHours = manualHours
+      ? Number(hours)
+      : calculateOvertimeHours(finalStart, finalEnd, isSunday)
+
+    if (computedHours <= 0) {
       alert('Số giờ tăng ca phải lớn hơn 0!')
       return
     }
 
     // Luôn làm tròn giờ kết thúc theo số giờ đã tính để không bị phút lẻ
-    const roundedEndTime = calculateEndTimeFromHours(startTime, Number(hours), isSunday) || endTime
+    const roundedEndTime = calculateEndTimeFromHours(finalStart, computedHours, isSunday) || finalEnd
 
     onSave({
       periodId: period.id,
       employeeId: employee.id,
       day: Number(day),
-      hours: Number(hours),
-      startTime,
+      hours: computedHours,
+      startTime: finalStart,
       endTime: roundedEndTime,
       reason: reason.trim() || defaultDeptReason,
       isSunday
@@ -122,23 +191,26 @@ export default function OvertimeModal({
             </select>
           </div>
 
-          {/* Khung giờ: Giờ vào và Giờ ra */}
+          {/* Khung giờ: Giờ vào và Giờ ra (Cho phép gõ phím trực tiếp 24h, xoá icon tối) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-foreground mb-1">
                 Giờ vào ca {isSunday ? '(Chủ Nhật)' : '(Ngày thường)'}
               </label>
               <input
-                type="time"
+                type="text"
+                maxLength={5}
                 value={startTime}
                 onChange={(e) => {
                   setStartTime(e.target.value)
                   setManualHours(false)
                 }}
-                className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                onBlur={() => handleBlurTime('start')}
+                placeholder={isSunday ? '07:30' : '16:30'}
+                className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground text-center tracking-wider outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
               />
-              <div className="text-[10px] text-muted-foreground mt-0.5">
-                {isSunday ? 'Gợi ý: 07:30, 08:00, 08:30...' : 'Mặc định: 16:30'}
+              <div className="text-[10px] text-muted-foreground mt-0.5 text-center">
+                {isSunday ? 'Gợi ý: 07:30 hoặc 08:00' : 'Mặc định: 16:30'}
               </div>
             </div>
 
@@ -147,18 +219,60 @@ export default function OvertimeModal({
                 Giờ xuống ca (ra về)
               </label>
               <input
-                type="time"
+                type="text"
+                maxLength={5}
                 value={endTime}
                 onChange={(e) => {
                   setEndTime(e.target.value)
                   setManualHours(false)
                 }}
-                className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                onBlur={() => handleBlurTime('end')}
+                placeholder={isSunday ? '16:30' : '18:30'}
+                className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground text-center tracking-wider outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
               />
-              <div className="text-[10px] text-muted-foreground mt-0.5">
+              <div className="text-[10px] text-muted-foreground mt-0.5 text-center">
                 Quy tắc lùi 30p
               </div>
             </div>
+          </div>
+
+          {/* Gợi ý chọn nhanh các mốc giờ phổ biến */}
+          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-secondary/30 rounded-xl border border-border/40">
+            <span className="text-[11px] font-semibold text-muted-foreground mr-0.5">Chọn nhanh:</span>
+            {(isSunday
+              ? [
+                  { label: '4h (11:30)', end: '11:30', h: 4 },
+                  { label: '8h (16:30)', end: '16:30', h: 8 },
+                  { label: '9h (17:30)', end: '17:30', h: 9 },
+                  { label: '10h (18:30)', end: '18:30', h: 10 }
+                ]
+              : [
+                  { label: '1h (17:30)', end: '17:30', h: 1 },
+                  { label: '2h (18:30)', end: '18:30', h: 2 },
+                  { label: '3h (19:30)', end: '19:30', h: 3 },
+                  { label: '4h (20:30)', end: '20:30', h: 4 }
+                ]
+            ).map((preset) => {
+              const isActive = endTime === preset.end && Number(hours) === preset.h
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setEndTime(preset.end)
+                    setHours(preset.h)
+                    setManualHours(false)
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border transition-all ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                      : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground border-border/60'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Số giờ tính tăng ca */}
@@ -167,7 +281,7 @@ export default function OvertimeModal({
               <div>
                 <span className="font-bold text-foreground text-xs">Tổng giờ tăng ca:</span>
                 <p className="text-[11px] text-muted-foreground">
-                  {isSunday ? 'Ca Chủ Nhật (đã trừ 1h trưa nếu qua trưa)' : 'Làm tròn theo mốc 30 phút'}
+                  {isSunday ? 'Ca Chủ Nhật (đã trừ 1h trưa nếu qua trưa)' : 'Làm tròn theo mốc 30 phút (có thể gõ phím trực tiếp)'}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
@@ -178,10 +292,19 @@ export default function OvertimeModal({
                   max="24"
                   value={hours}
                   onChange={(e) => {
-                    setHours(Number(e.target.value))
+                    const val = Number(e.target.value)
+                    setHours(val)
                     setManualHours(true)
+                    // Tự tính lại giờ xuống ca khi nhập tay số giờ
+                    if (val > 0) {
+                      const normStart = normalizeTimeInput(startTime) || (isSunday ? '07:30' : '16:30')
+                      const calculatedEnd = calculateEndTimeFromHours(normStart, val, isSunday)
+                      if (calculatedEnd) {
+                        setEndTime(calculatedEnd)
+                      }
+                    }
                   }}
-                  className="w-20 px-2 py-1 bg-card border border-primary/50 rounded-lg text-center font-bold text-base text-primary outline-none"
+                  className="w-20 px-2 py-1 bg-card border border-primary/50 rounded-lg text-center font-bold text-base text-primary outline-none focus:ring-2 focus:ring-primary"
                 />
                 <span className="font-bold text-foreground">Giờ</span>
               </div>

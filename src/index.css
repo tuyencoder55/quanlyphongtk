@@ -56,6 +56,13 @@ body {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
+/* Ẩn icon mặc định tối của trình duyệt trên input date/time */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
 /* ============================================================
    CẤU HÌNH IN ẤN CHUẨN KHỔ A4 LANDSCAPE (NGANG) THEO BIỂU MẪU GỐC
    ============================================================ */
