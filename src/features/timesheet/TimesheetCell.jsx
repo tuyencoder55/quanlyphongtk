@@ -90,7 +90,7 @@ export default function TimesheetCell({
     }
   }, [isOpen])
 
-  // Xử lý chọn nhanh (hỗ trợ lưu sang rowType khác nếu là ngày Chủ Nhật)
+  // Xử lý chọn nhanh
   const handleQuickSelect = (newValHours, newLeaveCode, newLeaveHours, targetRowType = rowType) => {
     onSave({
       entryId: targetRowType === rowType ? entry?.id : undefined,
@@ -102,20 +102,6 @@ export default function TimesheetCell({
       leaveCode: newLeaveCode,
       leaveHours: newLeaveHours,
     })
-
-    // Nếu đang ở hàng overtime ngày Chủ Nhật mà chọn điền lên hàng work, đồng thời dọn sạch ô overtime này về 0
-    if (rowType === 'overtime' && targetRowType === 'work' && valueHours > 0) {
-      onSave({
-        entryId: entry?.id,
-        periodId,
-        employeeId,
-        rowType: 'overtime',
-        day,
-        valueHours: 0,
-        leaveCode: null,
-        leaveHours: 0,
-      })
-    }
 
     setIsOpen(false)
   }
@@ -352,27 +338,25 @@ function getContrastTextColor(hexColor) {
           {/* 2. MENU NGÀY CHỦ NHẬT - HÀNG TĂNG CA (overtime - 加班) */}
           {rowType === 'overtime' && isSunday && (
             <div className="space-y-2.5">
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 space-y-1">
-                <div className="font-bold flex items-center gap-1.5 text-amber-200">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Quy định biểu mẫu:</span>
-                </div>
-                <p className="text-[11px] text-amber-200/90 leading-tight">
-                  Công ngày Chủ Nhật được điền vào hàng ở trên (<b>上班</b>), không điền vào hàng 加班.
-                </p>
+              <div className="p-2 bg-sky-500/10 border border-sky-500/30 rounded-xl text-[11px] text-sky-300 font-medium leading-tight">
+                ⏱️ Tăng ca ngày Chủ Nhật (tính từ <b>16:30</b> trở đi) lưu vào hàng <b>加班</b> này và cộng vào cột <b>Tổng ngày CN</b>.
               </div>
 
               <div>
                 <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1 px-0.5">
-                  Chọn giờ để điền vào hàng trên (上班):
+                  Chọn nhanh số giờ tăng ca (sau 16:30):
                 </div>
                 <div className="grid grid-cols-4 gap-1.5 text-center font-bold">
-                  {[2, 3, 4, 5, 6, 7, 7.5, 8].map((h) => (
+                  {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((h) => (
                     <button
                       key={h}
                       type="button"
-                      onClick={() => handleQuickSelect(h, null, 0, 'work')}
-                      className="py-1.5 px-1 bg-secondary/60 hover:bg-emerald-600 hover:text-white border border-border/60 hover:border-emerald-500 rounded-xl transition-all shadow-xs text-xs"
+                      onClick={() => handleQuickSelect(h, null, 0, 'overtime')}
+                      className={`py-1.5 px-1 rounded-xl text-xs font-bold border transition-all ${
+                        valueHours === h 
+                          ? 'bg-sky-500 text-white border-sky-500 shadow-sm' 
+                          : 'bg-secondary/60 hover:bg-secondary text-foreground border-border/60 hover:border-sky-500/50'
+                      }`}
                     >
                       {h}h
                     </button>
@@ -380,9 +364,41 @@ function getContrastTextColor(hexColor) {
                 </div>
               </div>
 
+              {/* Nhập số giờ tùy ý */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const val = Number(customHours)
+                  if (!isNaN(val) && val >= 0 && val <= 24) {
+                    handleQuickSelect(val, null, 0, 'overtime')
+                  }
+                }}
+                className="flex items-center gap-1.5 pt-1.5 border-t border-border/60"
+              >
+                <span className="text-[11px] text-muted-foreground font-medium shrink-0">
+                  Giờ khác:
+                </span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="24"
+                  placeholder="Ví dụ: 1.5"
+                  value={customHours}
+                  onChange={(e) => setCustomHours(e.target.value)}
+                  className="flex-1 px-2.5 py-1 bg-secondary/80 border border-border/80 rounded-lg text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1 bg-primary text-primary-foreground font-bold rounded-lg text-xs hover:bg-primary/90 transition-colors"
+                >
+                  Lưu
+                </button>
+              </form>
+
               {/* Xoá ô overtime hiện tại nếu đang có giờ */}
-              <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs px-0.5">
-                <span className="text-[10px] text-muted-foreground">Hàng này nên để trống</span>
+              <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-xs px-0.5">
+                <span className="text-[10px] text-muted-foreground">Không tăng ca thì để trống</span>
                 <button
                   type="button"
                   onClick={() => handleQuickSelect(0, null, 0, 'overtime')}

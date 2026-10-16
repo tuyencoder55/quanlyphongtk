@@ -167,22 +167,26 @@ TRƯỜNG HỢP 1: ẢNH LÀ BẢNG MÁY CHẤM CÔNG (Bảng quẹt vân tay / 
    - endTime: Ghi mốc giờ kết thúc làm tròn theo số giờ (ví dụ 1.5h thì ghi "18:00", 3.5h ghi "20:00").
    - Nếu giờ về trước 17:00 (như 16:33, 16:36, 16:39, 16:47): KHÔNG có tăng ca, BỎ QUA ngày đó.
 
-2. Với NGÀY CHỦ NHẬT (CN) - ĐẶC BIỆT CHÚ Ý, TUYỆT ĐỐI KHÔNG ĐƯỢC BỎ SÓT:
+2. Với NGÀY CHỦ NHẬT (CN) - ĐẶC BIỆT CHÚ Ý:
    - Các ngày Chủ Nhật trong tháng là: ${sundayDays.join(', ')}.
-   - Ngày Chủ Nhật công ty KHÔNG làm việc hành chính. BẤT CỨ NGÀY CHỦ NHẬT NÀO CÓ CHẤM CÔNG (có Chấm lần 1 và Chấm lần 2) THÌ TOÀN BỘ ĐỀU LÀ ĐI LÀM TĂNG CA!
-   - Nếu làm cả ngày (Chấm lần 1 khoảng 07:30, Chấm lần 2 khoảng 16:00 - 17:00):
-     + "hours": 8.0 (đã trừ 1h nghỉ trưa 11:30 - 12:30).
-     + "startTime": "07:30"
-     + "endTime": "16:30" (định dạng 24h, TUYỆT ĐỐI KHÔNG ghi 04:30 hay 04:33).
-   - Nếu làm nửa ngày sáng (khoảng 07:30 - 11:30): "hours": 4.0, startTime: "07:30", endTime: "11:30".
+   - Bình thường làm ngày Chủ Nhật từ 07:30 tới 16:30 là 8h (đây là giờ công ngày thường của Chủ Nhật, KHÔNG tính là tăng ca).
+   - TĂNG CA ngày Chủ Nhật: TÍNH TỪ 16:30 TRỞ ĐI (sau khi hết ca 8h).
+   - Nếu giờ về (Chấm lần 2) từ 17:00 trở đi:
+     + ĐÂY LÀ CA TĂNG CA CHỦ NHẬT!
+     + Số giờ tăng ca "hours" = (Giờ Chấm lần 2 - 16:30) làm tròn lùi về mốc 30 phút (0.5h).
+       Ví dụ: về 17:01 - 17:29 -> 0.5h; về 17:30 - 17:59 -> 1.0h; về 18:00 - 18:29 -> 1.5h; về 20:30 -> 4.0h.
+     + startTime: LUÔN LÀ "16:30" (định dạng 24h).
+     + endTime: Mốc giờ kết thúc làm tròn (ví dụ 1.0h ghi "17:30", 1.5h ghi "18:00", 4.0h ghi "20:30").
+   - Nếu Chấm lần 2 trước 17:00 (như 16:30 - 16:45): KHÔNG CÓ TĂNG CA, bỏ qua ngày đó.
+   - Trường hợp giấy note ghi riêng "CN đi làm 8h" hoặc ca ban ngày: trích xuất startTime "07:30", endTime "16:30", hours 8.0.
 
 TRƯỜNG HỢP 2: ẢNH LÀ GIẤY NOTE / SỔ TAY VIẾT TAY:
 1. Xác định số ngày tăng ca:
    - Ngày thường: ví dụ "ngày 2", "mùng 9", "10", "15/9"... trích xuất thành số ngày từ 1 đến ${daysInMonth}.
-   - Ngày Chủ Nhật: nếu ghi "CN", "Chủ nhật", "CN 27", "27 (CN)", hoặc chỉ ghi "CN: 8 tiếng": đối chiếu thứ tự tuần hoặc danh sách Chủ Nhật (${sundayDays.join(', ')}) để lấy đúng số ngày Chủ Nhật.
+   - Ngày Chủ Nhật: nếu ghi "CN: 1h", "CN tăng ca 2 tiếng", "CN 27 làm đến 18h30"...: lấy đúng số ngày Chủ Nhật.
 2. Giờ giấc & số tiếng:
-   - Ngày thường: startTime mặc định "16:30", endTime = 16:30 + số tiếng (ví dụ làm 2h thì endTime "18:30").
-   - Ngày Chủ Nhật: startTime mặc định "07:30", làm cả ngày 8 tiếng thì endTime "16:30".
+   - Tăng ca (cả ngày thường và Chủ Nhật): startTime mặc định "16:30", endTime = 16:30 + số tiếng (ví dụ làm 2h thì endTime "18:30").
+   - Nếu giấy note ghi rõ làm ca ngày Chủ Nhật 8 tiếng: startTime "07:30", endTime "16:30", hours 8.0.
 
 QUY TẮC BẮT BUỘC:
 - Mọi mốc thời gian bắt buộc dùng chuẩn 24 GIỜ: "16:30", "18:00", "20:00", "07:30"... TUYỆT ĐỐI KHÔNG DÙNG GIỜ 12H (như "04:30", "06:12", "04:33").
@@ -201,9 +205,9 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
     },
     {
       "day": 27,
-      "startTime": "07:30",
-      "endTime": "16:30",
-      "hours": 8.0,
+      "startTime": "16:30",
+      "endTime": "17:30",
+      "hours": 1.0,
       "reason": "${defaultReason}"
     }
   ]
@@ -302,25 +306,36 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
           const h = Math.round(Number(item.hours) * 2) / 2 // Làm tròn bước 0.5
           const isSun = sundayDays.includes(d)
 
-          // 1. Giờ bắt đầu: Chủ Nhật là 07:30, Ngày thường luôn là 16:30
-          let start = isSun ? '07:30' : '16:30'
+          // 1. Giờ bắt đầu:
+          // Ngày thường luôn là 16:30
+          // Chủ Nhật: Nếu ca ngày (>= 7h hoặc bắt đầu buổi sáng) thì 07:30 (Hàng 上班); Nếu tăng ca chiều tối (< 7h) thì 16:30 (Hàng 加班)
+          const isDayShift = isSun && (h >= 7 || (item.startTime && parseInt(item.startTime, 10) < 12))
+          let start = isDayShift ? '07:30' : '16:30'
+
           if (item.startTime) {
             let [sh, sm] = item.startTime.split(':').map(Number)
             if (!isNaN(sh)) {
-              if (!isSun && sh < 12 && sh >= 1) sh += 12 // Khắc phục nếu AI trả về 12h: 04:30 -> 16:30
-              if (isSun && sh > 12) sh = 7 // Phòng ngừa Chủ Nhật
+              // Khắc phục nếu AI/máy trả về định dạng 12h: ví dụ 04:30 chiều -> 16:30
+              if (sh < 12 && sh >= 1 && sh !== 7 && sh !== 8) {
+                sh += 12
+              }
               const formattedSh = String(sh).padStart(2, '0')
               const formattedSm = String(isNaN(sm) ? 0 : sm).padStart(2, '0')
               start = `${formattedSh}:${formattedSm}`
             }
           }
 
+          // Phân loại hàng trong bảng chấm công:
+          // - Chủ Nhật ca ngày (07:30 - 16:30): 'work' (Hàng 上班)
+          // - Ngày thường tăng ca hoặc Chủ Nhật tăng ca sau 16:30: 'overtime' (Hàng 加班)
+          const targetRowType = isSun ? (isDayShift ? 'work' : 'overtime') : 'overtime'
+
           // 2. Giờ kết thúc: Luôn tự động tính tròn theo số giờ (1.5h -> 18:00, 3.5h -> 20:00, 8h CN -> 16:30)
           let end = calculateEndTimeFromHours(start, h, isSun)
           if (!end && item.endTime) {
             let [eh, em] = item.endTime.split(':').map(Number)
             if (!isNaN(eh)) {
-              if (eh < 12 && eh >= 1) eh += 12 // Khắc phục 06:12 -> 18:12, 04:33 -> 16:33
+              if (eh < 12 && eh >= 1 && eh !== 11 && eh !== 12) eh += 12
               end = `${String(eh).padStart(2, '0')}:${String(isNaN(em) ? 0 : em).padStart(2, '0')}`
             }
           }
@@ -335,6 +350,7 @@ Hãy trả về kết quả thuần JSON (không bọc trong markdown code block
             hours: h,
             reason: itemReason,
             isSunday: isSun,
+            rowType: targetRowType,
             selected: true // Mặc định chọn để điền
           }
         })

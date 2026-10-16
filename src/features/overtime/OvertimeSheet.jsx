@@ -204,7 +204,7 @@ export default function OvertimeSheet({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              onDeleteEntry?.(entry.day, entry.isSunday)
+                              onDeleteEntry?.(entry.day, entry.isSunday, entry.rowType)
                             }}
                             title={`Xoá ca ngày ${entry.day}`}
                             className="p-0.5 rounded hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors"

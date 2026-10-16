@@ -200,12 +200,12 @@ export default function OvertimePage() {
   }
 
   // 5. Xoá ca tăng ca
-  const handleDeleteModal = async (day, isSunday) => {
+  const handleDeleteModal = async (day, isSunday, rowType) => {
     if (!window.confirm(`Bạn có chắc muốn xoá ca tăng ca ngày ${day}?`)) return
     try {
       const dayInfo = days.find((d) => d.day === Number(day))
       const isSun = typeof isSunday === 'boolean' ? isSunday : (dayInfo?.isSunday || false)
-      await deleteOvertimeEntry(period.id, currentEmployee.id, day, isSun)
+      await deleteOvertimeEntry(period.id, currentEmployee.id, day, isSun, rowType)
       toast.success(`Đã xoá ca tăng ca ngày ${day}!`)
       setIsModalOpen(false)
       setEditingEntry(null)

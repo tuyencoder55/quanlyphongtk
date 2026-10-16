@@ -34,13 +34,8 @@ export default function OvertimeModal({
   // Tự động điều chỉnh giờ bắt đầu khi chọn ngày nếu chưa chỉnh tay
   useEffect(() => {
     if (!initialData) {
-      if (isSunday) {
-        setStartTime('07:30')
-        setEndTime('16:30')
-      } else {
-        setStartTime('16:30')
-        setEndTime('18:30')
-      }
+      setStartTime('16:30')
+      setEndTime('18:30')
     }
   }, [day, isSunday, initialData])
 
@@ -133,6 +128,13 @@ export default function OvertimeModal({
     // Luôn làm tròn giờ kết thúc theo số giờ đã tính để không bị phút lẻ
     const roundedEndTime = calculateEndTimeFromHours(finalStart, computedHours, isSunday) || finalEnd
 
+    // Xác định rowType: ca tăng ca (sau 16:30) lưu vào overtime, ca ban ngày 07:30-16:30 lưu vào work
+    const targetRowType = initialData?.rowType || (
+      isSunday && (finalStart.startsWith('07:') || finalStart.startsWith('7:')) && computedHours <= 8 
+        ? 'work' 
+        : 'overtime'
+    )
+
     onSave({
       periodId: period.id,
       employeeId: employee.id,
@@ -141,7 +143,8 @@ export default function OvertimeModal({
       startTime: finalStart,
       endTime: roundedEndTime,
       reason: reason.trim() || defaultDeptReason,
-      isSunday
+      isSunday,
+      rowType: targetRowType
     })
   }
 
@@ -206,11 +209,11 @@ export default function OvertimeModal({
                   setManualHours(false)
                 }}
                 onBlur={() => handleBlurTime('start')}
-                placeholder={isSunday ? '07:30' : '16:30'}
+                placeholder="16:30"
                 className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground text-center tracking-wider outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
               />
               <div className="text-[10px] text-muted-foreground mt-0.5 text-center">
-                {isSunday ? 'Gợi ý: 07:30 hoặc 08:00' : 'Mặc định: 16:30'}
+                {isSunday ? 'Tăng ca: 16:30 (hoặc 07:30 ca ngày)' : 'Mặc định: 16:30'}
               </div>
             </div>
 
@@ -227,7 +230,7 @@ export default function OvertimeModal({
                   setManualHours(false)
                 }}
                 onBlur={() => handleBlurTime('end')}
-                placeholder={isSunday ? '16:30' : '18:30'}
+                placeholder="18:30"
                 className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-sm font-mono font-bold text-foreground text-center tracking-wider outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
               />
               <div className="text-[10px] text-muted-foreground mt-0.5 text-center">
@@ -239,26 +242,27 @@ export default function OvertimeModal({
           {/* Gợi ý chọn nhanh các mốc giờ phổ biến */}
           <div className="flex flex-wrap items-center gap-1.5 p-2 bg-secondary/30 rounded-xl border border-border/40">
             <span className="text-[11px] font-semibold text-muted-foreground mr-0.5">Chọn nhanh:</span>
-            {(isSunday
+            {(isSunday && (startTime.startsWith('07:') || startTime.startsWith('7:'))
               ? [
-                  { label: '4h (11:30)', end: '11:30', h: 4 },
-                  { label: '8h (16:30)', end: '16:30', h: 8 },
-                  { label: '9h (17:30)', end: '17:30', h: 9 },
-                  { label: '10h (18:30)', end: '18:30', h: 10 }
+                  { label: '4h sáng (11:30)', start: '07:30', end: '11:30', h: 4 },
+                  { label: '8h cả ngày (16:30)', start: '07:30', end: '16:30', h: 8 },
                 ]
               : [
-                  { label: '1h (17:30)', end: '17:30', h: 1 },
-                  { label: '2h (18:30)', end: '18:30', h: 2 },
-                  { label: '3h (19:30)', end: '19:30', h: 3 },
-                  { label: '4h (20:30)', end: '20:30', h: 4 }
+                  { label: '1h (17:30)', start: '16:30', end: '17:30', h: 1 },
+                  { label: '1.5h (18:00)', start: '16:30', end: '18:00', h: 1.5 },
+                  { label: '2h (18:30)', start: '16:30', end: '18:30', h: 2 },
+                  { label: '3h (19:30)', start: '16:30', end: '19:30', h: 3 },
+                  { label: '4h (20:30)', start: '16:30', end: '20:30', h: 4 },
+                  ...(isSunday ? [{ label: 'Ca ngày CN 8h (07:30 - 16:30)', start: '07:30', end: '16:30', h: 8 }] : [])
                 ]
             ).map((preset) => {
-              const isActive = endTime === preset.end && Number(hours) === preset.h
+              const isActive = (!preset.start || startTime === preset.start) && endTime === preset.end && Number(hours) === preset.h
               return (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => {
+                    if (preset.start) setStartTime(preset.start)
                     setEndTime(preset.end)
                     setHours(preset.h)
                     setManualHours(false)
@@ -330,7 +334,7 @@ export default function OvertimeModal({
             {initialData && onDelete ? (
               <button
                 type="button"
-                onClick={() => onDelete(initialData.day, isSunday)}
+                onClick={() => onDelete(initialData.day, isSunday, initialData.rowType)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-destructive/15 text-destructive hover:bg-destructive hover:text-white transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />

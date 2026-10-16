@@ -277,11 +277,12 @@ export default function OvertimeAiScanModal({
     const newRow = {
       id: `manual_${Date.now()}`,
       day: newDay,
-      startTime: isSun ? '07:30' : '16:30',
-      endTime: isSun ? '11:30' : '18:30',
+      startTime: '16:30',
+      endTime: '18:30',
       hours: 2.0,
       reason: defaultReason,
       isSunday: isSun,
+      rowType: 'overtime',
       selected: true
     }
 
@@ -312,7 +313,8 @@ export default function OvertimeAiScanModal({
             endTime: item.endTime,
             reason: item.reason,
             department: employee?.department || 'TK',
-            isSunday: item.isSunday
+            isSunday: item.isSunday,
+            rowType: item.rowType || (item.isSunday && item.hours >= 7 && (!item.startTime || item.startTime.startsWith('07') || item.startTime.startsWith('7:')) ? 'work' : 'overtime')
           })
           successCount++
         } catch (err) {

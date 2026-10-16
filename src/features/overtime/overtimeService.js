@@ -90,9 +90,10 @@ export function calculateEndTimeFromHours(startTimeStr, hours, isSunday = false)
   const [startH, startM] = String(startTimeStr).replace('h', ':').split(':').map(Number)
   let totalMinutes = (isNaN(startH) ? 0 : startH) * 60 + (isNaN(startM) ? 0 : startM) + hours * 60
 
-  // Nếu là ca ngày Chủ nhật có trừ giờ trưa (trên 5 tiếng và qua trưa)
-  if (isSunday && hours >= 4) {
-    totalMinutes += 60 // Bù lại 1h nghỉ trưa
+  // Nếu là ca ngày Chủ nhật làm qua trưa (bắt đầu buổi sáng trước 12h và trên 4 tiếng)
+  const isMorningShift = (isNaN(startH) ? 0 : startH) < 12
+  if (isSunday && isMorningShift && hours >= 4) {
+    totalMinutes += 60 // Bù lại 1h nghỉ trưa 11h30 - 12h30
   }
 
   const endH = Math.floor(totalMinutes / 60) % 24
@@ -133,47 +134,57 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
   if (error) throw error
 
   const sundayDays = (days || []).filter((d) => d.isSunday).map((d) => d.day)
+  const savedDetails = getSavedDetails()
+  const defaultReason = getDefaultOvertimeReason(department)
 
-  // Lọc các ca tăng ca:
-  // 1. Ngày thường: lấy dòng row_type = 'overtime'
-  // 2. Ngày Chủ Nhật: ưu tiên dòng row_type = 'work' (nếu có cả overtime cũ thì chỉ lấy 1)
-  const entryByDay = new Map()
+  // Lọc các ca hiển thị trên Giấy đề nghị tăng ca:
+  // - Ngày thường: lấy các dòng row_type = 'overtime'
+  // - Ngày Chủ Nhật:
+  //   + Dòng row_type = 'overtime' (tăng ca sau 16:30)
+  //   + Dòng row_type = 'work' (nếu có ca ban ngày 07:30 - 16:30 được lập trong biểu)
+  const resultEntries = []
 
   for (const entry of (entries || [])) {
     const isSunday = sundayDays.length > 0 
       ? sundayDays.includes(entry.day)
       : (new Date(periodYear, periodMonth - 1, entry.day).getDay() === 0)
 
-    if (isSunday) {
-      if (entry.row_type === 'work' || !entryByDay.has(entry.day)) {
-        entryByDay.set(entry.day, entry)
+    if (!isSunday) {
+      if (entry.row_type === 'overtime') {
+        resultEntries.push(entry)
       }
     } else {
-      if (entry.row_type === 'overtime') {
-        entryByDay.set(entry.day, entry)
-      }
+      resultEntries.push(entry)
     }
   }
 
-  const overtimeList = Array.from(entryByDay.values()).sort((a, b) => a.day - b.day)
-  const savedDetails = getSavedDetails()
-  const defaultReason = getDefaultOvertimeReason(department)
+  // Sắp xếp theo ngày, nếu cùng ngày thì ca work (ban ngày) trước, overtime (tăng ca sau 16h30) sau
+  resultEntries.sort((a, b) => {
+    if (a.day !== b.day) return a.day - b.day
+    return a.row_type === 'work' ? -1 : 1
+  })
 
   // Ghép chi tiết giờ vào, giờ ra cho từng ngày có tăng ca
-  return overtimeList.map((entry) => {
+  return resultEntries.map((entry) => {
     const isSunday = sundayDays.length > 0 
       ? sundayDays.includes(entry.day)
       : (new Date(periodYear, periodMonth - 1, entry.day).getDay() === 0)
 
-    const storageKey = `${periodId}_${employeeId}_${entry.day}`
-    const detail = savedDetails[storageKey]
+    const specificKey = `${periodId}_${employeeId}_${entry.day}_${entry.row_type}`
+    const genericKey = `${periodId}_${employeeId}_${entry.day}`
+    const detail = savedDetails[specificKey] || savedDetails[genericKey]
 
-    // Giờ bắt đầu mặc định: 07:30 nếu là Chủ nhật, 16:30 nếu ngày thường
-    const defaultStartTime = isSunday ? '07:30' : '16:30'
+    // Giờ bắt đầu mặc định:
+    // - Ca work ngày CN: 07:30 (ca ban ngày)
+    // - Ca overtime (ngày thường hoặc ngày CN sau 16:30): 16:30
+    let defaultStartTime = '16:30'
+    if (isSunday && entry.row_type === 'work') {
+      defaultStartTime = '07:30'
+    }
     const startTime = detail?.startTime || defaultStartTime
     
-    // Giờ kết thúc LUÔN ĐƯỢC CHUẨN HÓA LÀM TRÒN theo số giờ tăng ca (ví dụ 16h30 -> 19h42 tính 3h phải ghi là 16h30 — 19h30)
-    const roundedEndTime = calculateEndTimeFromHours(startTime, Number(entry.value_hours), isSunday)
+    const isDayShift = isSunday && entry.row_type === 'work'
+    const roundedEndTime = calculateEndTimeFromHours(startTime, Number(entry.value_hours), isDayShift)
     const endTime = roundedEndTime || detail?.endTime || ''
     
     // Nếu chưa có lý do hoặc dữ liệu cũ của CTP đang mang lý do của TK thì tự chuyển sang CTP
@@ -192,6 +203,7 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
       endTime,
       reason,
       isSunday,
+      rowType: entry.row_type,
       dateString: `${String(entry.day).padStart(2, '0')}/${String(periodMonth).padStart(2, '0')}/${periodYear}`,
       timeRangeFormatted: formatOvertimeTimeString(entry.day, periodMonth, periodYear, startTime, endTime),
     }
@@ -201,8 +213,9 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
 /**
  * Lưu hoặc cập nhật một ca tăng ca
  * - Ngày thường: lưu vào dòng `overtime` (加班)
- * - Ngày Chủ Nhật: lưu vào dòng `work` (上班) theo đúng chuẩn biểu mẫu gốc,
- *   đồng thời reset dòng `overtime` về 0 để không bị trùng lặp ở dưới.
+ * - Ngày Chủ Nhật:
+ *   + Tăng ca từ 16:30 trở đi: lưu vào dòng `overtime` (加班)
+ *   + Ca ban ngày 07:30 - 16:30: lưu vào dòng `work` (上班)
  */
 export async function saveOvertimeEntry({
   periodId,
@@ -213,7 +226,8 @@ export async function saveOvertimeEntry({
   endTime,
   reason,
   department = 'TK',
-  isSunday
+  isSunday,
+  rowType
 }) {
   const dayNum = Number(day)
   const hoursNum = Number(hours)
@@ -235,8 +249,21 @@ export async function saveOvertimeEntry({
     }
   }
 
-  // Ngày CN lưu vào dòng work (上班), ngày thường lưu vào dòng overtime (加班)
-  const targetRowType = isSun ? 'work' : 'overtime'
+  // Xác định dòng lưu dữ liệu:
+  // - Nếu có rowType tường minh thì dùng rowType đó
+  // - Ngày thường: luôn là 'overtime' (加班)
+  // - Ngày Chủ Nhật:
+  //   + Nếu bắt đầu từ 16:30 trở đi (hoặc ca tăng ca chiều tối): lưu vào 'overtime' (加班)
+  //   + Nếu là ca ban ngày 07:30 - 16:30: lưu vào 'work' (上班)
+  let targetRowType = rowType
+  if (!targetRowType) {
+    if (!isSun) {
+      targetRowType = 'overtime'
+    } else {
+      const isDayShift = startTime && (startTime.startsWith('07:') || startTime.startsWith('7:')) && hoursNum <= 8
+      targetRowType = isDayShift ? 'work' : 'overtime'
+    }
+  }
 
   // 1. Kiểm tra xem ô ngày này trong timesheet_entries đã có chưa
   const { data: existing } = await supabaseAdmin
@@ -274,23 +301,14 @@ export async function saveOvertimeEntry({
     if (insertErr) throw insertErr
   }
 
-  // 2. Nếu là Chủ Nhật, đảm bảo ô dòng overtime (加班) được reset về 0 (tránh lưu đè/lẫn ở dưới)
-  if (isSun) {
-    await supabaseAdmin
-      .from('timesheet_entries')
-      .update({
-        value_hours: 0,
-        updated_at: new Date().toISOString()
-      })
-      .eq('period_id', periodId)
-      .eq('employee_id', employeeId)
-      .eq('row_type', 'overtime')
-      .eq('day', dayNum)
-  }
-
-  // 3. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage
-  const storageKey = `${periodId}_${employeeId}_${dayNum}`
-  saveDetailToStorage(storageKey, {
+  // 2. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage
+  const specificKey = `${periodId}_${employeeId}_${dayNum}_${targetRowType}`
+  saveDetailToStorage(specificKey, {
+    startTime,
+    endTime,
+    reason: finalReason
+  })
+  saveDetailToStorage(`${periodId}_${employeeId}_${dayNum}`, {
     startTime,
     endTime,
     reason: finalReason
@@ -301,39 +319,12 @@ export async function saveOvertimeEntry({
 
 /**
  * Xoá một ca tăng ca
- * - Nếu là Chủ Nhật: reset dòng `work` về 0 (và cả dòng `overtime` nếu có)
- * - Nếu là ngày thường: reset dòng `overtime` về 0
+ * - Reset đúng dòng tương ứng (overtime hoặc work) về 0, không ảnh hưởng dòng khác
  */
-export async function deleteOvertimeEntry(periodId, employeeId, day, isSunday) {
+export async function deleteOvertimeEntry(periodId, employeeId, day, isSunday, rowType = 'overtime') {
   const dayNum = Number(day)
+  const targetRowType = rowType || 'overtime'
 
-  let isSun = isSunday
-  if (typeof isSun !== 'boolean') {
-    const { data: periodData } = await supabase
-      .from('timesheet_periods')
-      .select('month, year')
-      .eq('id', periodId)
-      .single()
-    if (periodData) {
-      isSun = new Date(periodData.year, periodData.month - 1, dayNum).getDay() === 0
-    }
-  }
-
-  // Nếu là Chủ Nhật, reset cả dòng work
-  if (isSun) {
-    await supabaseAdmin
-      .from('timesheet_entries')
-      .update({
-        value_hours: 0,
-        updated_at: new Date().toISOString()
-      })
-      .eq('period_id', periodId)
-      .eq('employee_id', employeeId)
-      .eq('row_type', 'work')
-      .eq('day', dayNum)
-  }
-
-  // Luôn reset dòng overtime về 0
   const { data, error } = await supabaseAdmin
     .from('timesheet_entries')
     .update({
@@ -342,13 +333,13 @@ export async function deleteOvertimeEntry(periodId, employeeId, day, isSunday) {
     })
     .eq('period_id', periodId)
     .eq('employee_id', employeeId)
-    .eq('row_type', 'overtime')
+    .eq('row_type', targetRowType)
     .eq('day', dayNum)
 
   if (error) throw error
 
-  const storageKey = `${periodId}_${employeeId}_${dayNum}`
-  removeDetailFromStorage(storageKey)
+  removeDetailFromStorage(`${periodId}_${employeeId}_${dayNum}_${targetRowType}`)
+  removeDetailFromStorage(`${periodId}_${employeeId}_${dayNum}`)
 
   return { success: true, data }
 }
@@ -363,18 +354,18 @@ export async function quickClockOutToday(periodId, employeeId, isSunday = false,
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
 
-  const defaultStartTime = isSunday ? '07:30' : '16:30'
+  // Xuống ca tăng ca chiều tối tính từ mốc 16:30
+  const defaultStartTime = '16:30'
   const endTime = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`
 
   // Tính số giờ làm tròn lùi về mốc 30 phút
-  const hours = calculateOvertimeHours(defaultStartTime, endTime, isSunday)
+  const hours = calculateOvertimeHours(defaultStartTime, endTime, false)
 
   if (hours <= 0) {
     throw new Error(`Hiện tại mới ${endTime}, chưa đủ 30 phút tăng ca tính từ mốc ${defaultStartTime}!`)
   }
 
-  // Giờ kết thúc được làm tròn theo số giờ được tính (ví dụ 16h30 -> 19h42 tính 3h thì ghi là 19:30)
-  const roundedEndTime = calculateEndTimeFromHours(defaultStartTime, hours, isSunday)
+  const roundedEndTime = calculateEndTimeFromHours(defaultStartTime, hours, false)
   const defaultReason = getDefaultOvertimeReason(department)
 
   await saveOvertimeEntry({
@@ -386,7 +377,8 @@ export async function quickClockOutToday(periodId, employeeId, isSunday = false,
     endTime: roundedEndTime,
     reason: defaultReason,
     department,
-    isSunday
+    isSunday,
+    rowType: 'overtime'
   })
 
   return {
