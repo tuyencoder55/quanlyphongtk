@@ -27,20 +27,24 @@ export default function TimesheetCell({
   const currentLeaveType = leaveCode ? leaveTypes.find((lt) => lt.code === leaveCode) : null
 
   const [customHours, setCustomHours] = useState('')
+  const [workCustomHours, setWorkCustomHours] = useState('7.5')
+  const [workCustomLeaveOption, setWorkCustomLeaveOption] = useState('')
 
-  // Cập nhật customHours khi mở popover
+  // Cập nhật customHours và workCustomHours khi mở popover
   useEffect(() => {
     if (isOpen) {
       setCustomHours(valueHours > 0 ? String(valueHours) : '')
+      setWorkCustomHours(valueHours > 0 ? String(valueHours) : '7.5')
+      setWorkCustomLeaveOption(leaveCode || '')
     }
-  }, [isOpen, valueHours])
+  }, [isOpen, valueHours, leaveCode])
 
   // Tính toán toạ độ thông minh: Luôn nằm trọn vẹn trong viewport màn hình (không bao giờ tràn đỉnh hay đáy)
   useEffect(() => {
     if (isOpen && cellRef.current) {
       const rect = cellRef.current.getBoundingClientRect()
-      const popoverWidth = isSunday ? 360 : (rowType === 'work' ? 510 : 280)
-      const popoverHeight = isSunday ? 320 : (rowType === 'work' ? 280 : 180)
+      const popoverWidth = isSunday ? 360 : (rowType === 'work' ? 520 : 280)
+      const popoverHeight = isSunday ? 340 : (rowType === 'work' ? 430 : 180)
 
       const spaceAbove = rect.top
       const spaceBelow = window.innerHeight - rect.bottom
@@ -216,8 +220,8 @@ function getContrastTextColor(hexColor) {
         <div
           ref={popoverRef}
           className={`fixed z-50 ${
-            isSunday ? 'w-[360px]' : (rowType === 'work' ? 'w-[510px]' : 'w-[280px]')
-          } max-w-[96vw] bg-card/95 backdrop-blur-xl border border-border/90 rounded-2xl shadow-2xl p-3.5 text-xs text-foreground animate-popup-smooth`}
+            isSunday ? 'w-[360px]' : (rowType === 'work' ? 'w-[520px]' : 'w-[280px]')
+          } max-w-[96vw] max-h-[92vh] overflow-y-auto bg-card/95 backdrop-blur-xl border border-border/90 rounded-2xl shadow-2xl p-3.5 text-xs text-foreground animate-popup-smooth`}
           style={{
             top: popoverCoords.top,
             left: popoverCoords.left,
@@ -429,6 +433,93 @@ function getContrastTextColor(hexColor) {
                   8h công
                 </span>
               </button>
+
+              {/* Nhập tay số giờ làm (Đi trễ, về sớm, làm việc thực tế) */}
+              <div className="p-2.5 bg-secondary/40 border border-border/80 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-foreground">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Nhập tay số giờ làm (Đi trễ / Về sớm):</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    VD: 7.5h, 7h, 6.5h...
+                  </span>
+                </div>
+
+                {/* Các nút bấm nhanh mốc đi trễ phổ biến */}
+                <div className="grid grid-cols-5 gap-1.5 text-center font-bold">
+                  {[7.5, 7, 6.5, 6, 5].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => handleQuickSelect(h, null, 0)}
+                      className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition-all ${
+                        valueHours === h && !leaveCode
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                          : 'bg-secondary/70 hover:bg-secondary text-foreground border-border/60 hover:border-amber-500/50'
+                      }`}
+                      title={`${h}h làm việc thực tế (không bù phép)`}
+                    >
+                      {h}h làm
+                    </button>
+                  ))}
+                </div>
+
+                {/* Form nhập tay số giờ tùy ý + tùy chọn bù phép */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const val = Number(workCustomHours)
+                    if (!isNaN(val) && val > 0 && val <= 24) {
+                      if (!workCustomLeaveOption) {
+                        handleQuickSelect(val, null, 0)
+                      } else {
+                        const rem = Math.max(0, 8 - val)
+                        handleQuickSelect(val, workCustomLeaveOption, rem)
+                      }
+                    }
+                  }}
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 pt-1.5 border-t border-border/50"
+                >
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] text-muted-foreground font-medium">Giờ làm:</span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      max="24"
+                      placeholder="7.5"
+                      value={workCustomHours}
+                      onChange={(e) => setWorkCustomHours(e.target.value)}
+                      className="w-16 px-2 py-1 bg-secondary border border-border/80 rounded-lg text-xs font-bold text-foreground text-center outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+
+                  <select
+                    value={workCustomLeaveOption}
+                    onChange={(e) => setWorkCustomLeaveOption(e.target.value)}
+                    className="flex-1 min-w-[170px] px-2 py-1 bg-secondary border border-border/80 rounded-lg text-xs text-foreground outline-none focus:ring-1 focus:ring-primary truncate cursor-pointer"
+                  >
+                    <option value="">Chỉ tính giờ làm (Không bù phép)</option>
+                    {(leaveTypes.length > 0 ? leaveTypes : [
+                      { code: 'PT', name: 'Phép thường (PT)' },
+                      { code: 'PN', name: 'Phép năm (PN)' },
+                      { code: 'KP', name: 'Không phép (KP)' }
+                    ]).map((lt) => (
+                      <option key={lt.code} value={lt.code}>
+                        Bù đủ 8h bằng {lt.code} ({lt.name})
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors shrink-0 shadow-xs"
+                  >
+                    Lưu
+                  </button>
+                </form>
+              </div>
 
               {/* Danh sách các loại phép (Layout 3 cột ngang rộng rãi) */}
               <div className="space-y-1">
