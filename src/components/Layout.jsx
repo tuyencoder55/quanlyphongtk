@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SelfChangePasswordModal from '@/features/users/SelfChangePasswordModal'
+import SupabaseStorageWidget from './SupabaseStorageWidget'
 
 export default function Layout({ children }) {
   const { user, profile, signOut } = useAuthStore()
@@ -161,6 +162,11 @@ export default function Layout({ children }) {
               </Link>
             )
           })}
+        </div>
+
+        {/* Chỉ số dung lượng Supabase đã dùng */}
+        <div className="border-t border-border/50">
+          <SupabaseStorageWidget collapsed={collapsed} />
         </div>
 
         {/* Nút Thu nhỏ / Mở rộng Sidebar (dành cho Desktop) */}
