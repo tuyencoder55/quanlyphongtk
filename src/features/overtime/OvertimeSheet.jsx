@@ -43,8 +43,9 @@ export default function OvertimeSheet({
   }
 
   return (
-    <div className={`overtime-sheet bg-white text-black p-4 sm:p-5 rounded-2xl shadow-lg border border-slate-200 print:shadow-none print:border-none print:p-0 print:m-0 print:rounded-none max-w-[820px] mx-auto text-sm font-sans ${isBulkPrint ? 'page-break-after-always' : ''}`}>
-      {/* 1. ĐẦU TRANG: LOGO + CÔNG TY (TRÁI) & QUỐC HIỆU (PHẢI) */}
+    <div className={`overtime-sheet bg-white text-black p-4 sm:p-5 rounded-2xl shadow-lg border border-slate-200 print:shadow-none print:border-none print:p-0 print:m-0 print:rounded-none max-w-[820px] mx-auto text-sm font-sans flex flex-col justify-between min-h-[920px] print:min-h-[270mm] ${isBulkPrint ? 'page-break-after-always' : ''}`}>
+      <div>
+        {/* 1. ĐẦU TRANG: LOGO + CÔNG TY (TRÁI) & QUỐC HIỆU (PHẢI) */}
       <div className="grid grid-cols-2 items-center gap-2 mb-1">
         {/* Góc trái: Logo + Tên Công ty */}
         <div className="flex items-center gap-2">
@@ -282,9 +283,10 @@ export default function OvertimeSheet({
           </div>
         </div>
       </div>
+      </div>
 
       {/* 6. MÃ SỐ BIỂU MẪU GÓC DƯỚI CÙNG BÊN PHẢI */}
-      <div className="text-right text-[7pt] sm:text-[7.5pt] text-slate-500 font-serif mt-2 pr-1">
+      <div className="text-right text-[7pt] sm:text-[7.5pt] text-slate-500 font-serif mt-auto pt-4 pr-1">
         表单编号 Mã số biểu：QMS.GL-4005-1
       </div>
     </div>

@@ -258,6 +258,10 @@ export default function OvertimePage() {
         }
         .overtime-sheet {
           max-width: 100% !important;
+          min-height: 270mm !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: space-between !important;
           margin: 0 auto !important;
         }
       }
@@ -314,6 +318,10 @@ export default function OvertimePage() {
           }
           .overtime-sheet {
             max-width: 100% !important;
+            min-height: 270mm !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
             margin: 0 auto !important;
           }
         }

@@ -313,6 +313,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .overtime-sheet {
     width: 100% !important;
     max-width: 100% !important;
+    min-height: 270mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
