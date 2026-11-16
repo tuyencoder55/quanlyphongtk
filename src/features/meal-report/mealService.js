@@ -33,6 +33,55 @@ function saveLocalMealReport(year, month, department, dataMap) {
 }
 
 /**
+ * Quét toàn bộ dữ liệu báo cơm cũ từng lưu trong localStorage của trình duyệt
+ * và tự động đẩy lên Supabase Cloud (chỉ cần chạy 1 lần khi máy đó mở web)
+ */
+export async function syncAllLocalMealReportsToCloud() {
+  const client = supabaseAdmin || supabase
+  if (!client || typeof window === 'undefined') return
+
+  try {
+    const keysToSync = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(LOCAL_STORAGE_PREFIX)) {
+        keysToSync.push(key)
+      }
+    }
+
+    for (const key of keysToSync) {
+      const parts = key.replace(LOCAL_STORAGE_PREFIX, '').split('_')
+      if (parts.length >= 2) {
+        const year = Number(parts[0])
+        const month = Number(parts[1])
+        const dept = parts[2] || 'TK'
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          const dataMap = JSON.parse(raw)
+          const rows = Object.entries(dataMap).map(([day, val]) => ({
+            month,
+            year,
+            day: Number(day),
+            department: dept,
+            total_people: Number(val.total_people) || 0,
+            absent_count: Number(val.absent_count) || 0,
+            lunch_count: Number(val.lunch_count) || 0,
+            dinner_count: Number(val.dinner_count) || 0,
+            notes: val.notes || '',
+            updated_at: new Date().toISOString()
+          }))
+          if (rows.length > 0) {
+            await client.from('meal_entries').upsert(rows, { onConflict: 'month,year,day,department' })
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Lỗi quét đồng bộ toàn bộ local lên cloud:', err)
+  }
+}
+
+/**
  * Lấy dữ liệu biểu báo cơm của một tháng/năm cụ thể
  * Trả về danh sách đủ số ngày trong tháng (từ ngày 01 đến 28/29/30/31)
  */
@@ -56,6 +105,33 @@ export async function getMealReport(month, year, department = 'TK') {
       data.forEach((item) => {
         dbMap[item.day] = item
       })
+
+      // Nếu trên Cloud chưa có dữ liệu của tháng này, nhưng dưới LocalStorage máy này có:
+      // Tự động đẩy dữ liệu từ localStorage lên Cloud luôn!
+      if (data.length === 0 && Object.keys(localMap).length > 0) {
+        try {
+          const rowsToSync = Object.entries(localMap).map(([day, val]) => ({
+            month,
+            year,
+            day: Number(day),
+            department,
+            total_people: Number(val.total_people) || 0,
+            absent_count: Number(val.absent_count) || 0,
+            lunch_count: Number(val.lunch_count) || 0,
+            dinner_count: Number(val.dinner_count) || 0,
+            notes: val.notes || '',
+            updated_at: new Date().toISOString()
+          }))
+          if (rowsToSync.length > 0) {
+            await client.from('meal_entries').upsert(rowsToSync, { onConflict: 'month,year,day,department' })
+            rowsToSync.forEach((r) => {
+              dbMap[r.day] = r
+            })
+          }
+        } catch (syncErr) {
+          console.warn('Lỗi tự động đồng bộ local lên Supabase:', syncErr)
+        }
+      }
     } else if (error) {
       console.warn('Lỗi đọc bảng meal_entries từ Supabase:', error.message)
     }

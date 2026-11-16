@@ -3,7 +3,8 @@ import { useAuthStore } from '@/store/useAuthStore'
 import {
   getMealReport,
   saveMealReport,
-  exportMealReportExcel
+  exportMealReportExcel,
+  syncAllLocalMealReportsToCloud
 } from '@/features/meal-report/mealService'
 import MealReportSheet from '@/features/meal-report/MealReportSheet'
 import {
@@ -66,6 +67,11 @@ export default function MealReportPage() {
   const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
   const [isCloudSynced, setIsCloudSynced] = useState(true) // Trạng thái kết nối Supabase Cloud
   const isDirtyRef = useRef(false) // Chỉ lưu khi người dùng THỰC SỰ gõ/sửa ô
+
+  // 0. Tự động quét và đẩy toàn bộ dữ liệu localStorage cũ của máy này lên Supabase Cloud
+  useEffect(() => {
+    syncAllLocalMealReportsToCloud()
+  }, [])
 
   // 1. Tải dữ liệu biểu báo cơm theo tháng/năm đang chọn
   useEffect(() => {
