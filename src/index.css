@@ -358,6 +358,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .meal-report-sheet {
     width: 100% !important;
     max-width: 100% !important;
+    min-height: 268mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
@@ -383,8 +388,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border: 0.5pt solid #000000 !important;
     color: #000000 !important;
     background-color: #ffffff !important;
-    padding: 0.5px 1px !important;
-    line-height: 1.15 !important;
+    padding: 1.5px 1px !important;
+    line-height: 1.25 !important;
+  }
+
+  .meal-report-sheet tbody tr {
+    height: 5.4mm !important;
   }
 }
 
