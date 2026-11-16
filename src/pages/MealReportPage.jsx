@@ -13,9 +13,43 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  Copy
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+const MEAL_ENTRIES_SQL = `-- Chạy lệnh này trên Supabase SQL Editor:
+create table if not exists meal_entries (
+  id uuid primary key default gen_random_uuid(),
+  month int not null check (month between 1 and 12),
+  year int not null check (year >= 2000),
+  day int not null check (day between 1 and 31),
+  total_people int not null default 0,
+  absent_count int not null default 0,
+  lunch_count int not null default 0,
+  dinner_count int not null default 0,
+  department text not null default 'TK',
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (month, year, day, department)
+);
+
+create index if not exists idx_meal_entries_month_year on meal_entries(month, year, department);
+alter table meal_entries enable row level security;
+
+create policy "Allow select meal_entries" on meal_entries
+  for select using (auth.role() = 'authenticated');
+
+create policy "Allow write meal_entries" on meal_entries
+  for all using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+      and (profiles.role = 'admin' or profiles.can_edit = true)
+    )
+  );`
 
 export default function MealReportPage() {
   const { profile } = useAuthStore()
@@ -30,37 +64,61 @@ export default function MealReportPage() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
-  const isLoadedRef = useRef(false)
+  const [isCloudSynced, setIsCloudSynced] = useState(true) // Trạng thái kết nối Supabase Cloud
+  const isDirtyRef = useRef(false) // Chỉ lưu khi người dùng THỰC SỰ gõ/sửa ô
 
-  // 1. Tải dữ liệu biểu báo cơm
-  const loadData = useCallback(async () => {
+  // 1. Tải dữ liệu biểu báo cơm theo tháng/năm đang chọn
+  useEffect(() => {
+    let isCancelled = false
     setLoading(true)
-    isLoadedRef.current = false
-    try {
-      const data = await getMealReport(selectedMonth, selectedYear, department)
-      setEntries(data)
-      isLoadedRef.current = true
-      setSaveStatus('saved')
-    } catch (err) {
-      toast.error('Lỗi tải biểu báo cơm: ' + err.message)
-    } finally {
-      setLoading(false)
+    isDirtyRef.current = false // Reset cờ sửa để không tự động lưu đè khi vừa tải
+
+    async function loadData() {
+      try {
+        const data = await getMealReport(selectedMonth, selectedYear, department)
+        if (!isCancelled) {
+          setEntries(data)
+          setIsCloudSynced(Boolean(data.isDbConnected))
+          setSaveStatus('saved')
+          isDirtyRef.current = false
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          toast.error('Lỗi tải biểu báo cơm: ' + err.message)
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadData()
+
+    return () => {
+      isCancelled = true
     }
   }, [selectedMonth, selectedYear, department])
 
+  // 2. Tự Động Lưu (Auto-Save) CHỈ KHI người dùng có chỉnh sửa thực tế
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    // Không lưu nếu: chưa ai sửa ô, không có quyền sửa, hoặc danh sách rỗng
+    if (!isDirtyRef.current || !canEdit || entries.length === 0) return
 
-  // 2. Tự Động Lưu (Auto-Save) ngầm như Google Sheets mỗi khi nhập liệu
-  useEffect(() => {
-    if (!isLoadedRef.current || !canEdit || entries.length === 0) return
+    const targetMonth = selectedMonth
+    const targetYear = selectedYear
 
     setSaveStatus('saving')
     const timer = setTimeout(async () => {
       try {
-        await saveMealReport(selectedMonth, selectedYear, entries, department)
+        const res = await saveMealReport(targetMonth, targetYear, entries, department)
         setSaveStatus('saved')
+        isDirtyRef.current = false
+        if (res?.isLocalOnly) {
+          setIsCloudSynced(false)
+        } else {
+          setIsCloudSynced(true)
+        }
       } catch (err) {
         console.warn('Lỗi tự động lưu biểu báo cơm:', err)
         setSaveStatus('saved')
@@ -68,11 +126,12 @@ export default function MealReportPage() {
     }, 600)
 
     return () => clearTimeout(timer)
-  }, [entries, selectedMonth, selectedYear, department, canEdit])
+  }, [entries, canEdit, department, selectedMonth, selectedYear])
 
   // 3. Xử lý khi Admin nhập ô
   const handleChangeEntry = (day, field, value) => {
     const numVal = Math.max(0, parseInt(value, 10) || 0)
+    isDirtyRef.current = true // Đánh dấu người dùng ĐÃ SỬA Ô THỰC TẾ
 
     setEntries((prev) =>
       prev.map((row) => {
@@ -122,8 +181,13 @@ export default function MealReportPage() {
     }
   }
 
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(MEAL_ENTRIES_SQL)
+    toast.success('Đã sao chép câu lệnh SQL tạo bảng meal_entries!')
+  }
+
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-6 pb-16 print:space-y-0 print:p-0 print:m-0">
       {/* 1. THANH TIÊU ĐỀ TRANG (Ẩn khi in) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3">
@@ -152,10 +216,18 @@ export default function MealReportPage() {
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   <span>Đang lưu...</span>
                 </span>
-              ) : (
+              ) : isCloudSynced ? (
                 <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Đã tự động lưu</span>
+                  <span>Đã lưu lên Cloud</span>
+                </span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 text-amber-400 font-medium cursor-help"
+                  title="Bảng meal_entries chưa có trên Supabase, dữ liệu đang tạm lưu ở máy này"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Chỉ lưu trên máy</span>
                 </span>
               )}
             </div>
@@ -180,6 +252,31 @@ export default function MealReportPage() {
           </button>
         </div>
       </div>
+
+      {/* CẢNH BÁO NẾU SUPABASE CHƯA TẠO BẢNG MEAL_ENTRIES */}
+      {!loading && !isCloudSynced && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs print:hidden">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400">
+                Lưu ý: Bảng meal_entries chưa được khởi tạo trên Supabase Cloud!
+              </span>
+              <p className="text-muted-foreground leading-relaxed">
+                Dữ liệu hiện tại chỉ lưu tạm trên bộ nhớ của trình duyệt này. Nếu bạn đổi máy tính khác hoặc xóa cache thì dữ liệu các tháng cũ sẽ không xem được. Hãy chạy câu lệnh SQL trên Supabase để lưu vĩnh viễn trên Cloud.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopySql}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/30 transition-colors shrink-0"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copy mã SQL</span>
+          </button>
+        </div>
+      )}
 
       {/* 2. THANH ĐIỀU HƯỚNG KỲ THÁNG/NĂM & BỘ PHẬN (Ẩn khi in) */}
       <div className="bg-card border border-border/80 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4 print:hidden">
@@ -247,7 +344,7 @@ export default function MealReportPage() {
           <span className="text-sm">Đang tải dữ liệu biểu báo cơm...</span>
         </div>
       ) : (
-        <div className="overflow-x-auto pb-4">
+        <div className="overflow-x-auto pb-4 print:p-0 print:m-0 print:overflow-visible">
           <MealReportSheet
             month={selectedMonth}
             year={selectedYear}

@@ -351,6 +351,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     page-break-after: always !important;
     break-after: page !important;
   }
+
+  /* ============================================================
+     HỖ TRỢ IN BIỂU BÁO CƠM HÀNG NGÀY (A4 DỌC - VỪA KHÍT 1 TRANG)
+     ============================================================ */
+  .meal-report-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .meal-report-sheet table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .meal-report-sheet th,
+  .meal-report-sheet td {
+    border: 0.5pt solid #000000 !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    padding: 0.5px 1px !important;
+    line-height: 1.15 !important;
+  }
 }
 
 /* ============================================================

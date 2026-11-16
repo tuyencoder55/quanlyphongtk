@@ -40,6 +40,7 @@ export async function getMealReport(month, year, department = 'TK') {
   const daysInMonth = getDaysForMonth(year, month)
   const localMap = getLocalMealReport(year, month, department)
   const dbMap = {}
+  let isDbConnected = false
 
   try {
     const client = supabaseAdmin || supabase
@@ -51,16 +52,19 @@ export async function getMealReport(month, year, department = 'TK') {
       .eq('department', department)
 
     if (!error && Array.isArray(data)) {
+      isDbConnected = true
       data.forEach((item) => {
         dbMap[item.day] = item
       })
+    } else if (error) {
+      console.warn('Lỗi đọc bảng meal_entries từ Supabase:', error.message)
     }
   } catch (err) {
     console.warn('Bảng meal_entries chưa có trên Supabase, dùng dữ liệu lưu trữ trình duyệt:', err)
   }
 
   // Kết hợp dữ liệu ngày + DB + LocalStorage
-  return daysInMonth.map((d) => {
+  const entries = daysInMonth.map((d) => {
     const saved = dbMap[d.day] || localMap[d.day] || {}
     const mm = String(month).padStart(2, '0')
     const dd = String(d.day).padStart(2, '0')
@@ -73,13 +77,17 @@ export async function getMealReport(month, year, department = 'TK') {
       vi: d.vi,
       zh: d.zh,
       isSunday: d.isSunday,
-      total_people: saved.total_people !== undefined ? saved.total_people : (d.isSunday ? 0 : 0),
+      total_people: saved.total_people !== undefined ? saved.total_people : 0,
       absent_count: saved.absent_count !== undefined ? saved.absent_count : 0,
       lunch_count: saved.lunch_count !== undefined ? saved.lunch_count : 0,
       dinner_count: saved.dinner_count !== undefined ? saved.dinner_count : 0,
       notes: saved.notes || ''
     }
   })
+
+  // Đính kèm cờ kết nối DB vào mảng để tương thích ngược 100%
+  entries.isDbConnected = isDbConnected
+  return entries
 }
 
 /**
@@ -117,16 +125,18 @@ export async function saveMealReport(month, year, entries, department = 'TK') {
 
     const { error } = await client
       .from('meal_entries')
-      .upsert(rows, { onConflict: 'month, year, day, department' })
+      .upsert(rows, { onConflict: 'month,year,day,department' })
 
     if (error) {
       console.warn('Lỗi ghi Supabase (có thể bảng chưa được chạy migration):', error.message)
+      return { success: false, error: error.message, isLocalOnly: true }
     }
+
+    return { success: true, isLocalOnly: false }
   } catch (err) {
     console.warn('Không thể kết nối bảng meal_entries trên Supabase:', err)
+    return { success: false, error: err.message, isLocalOnly: true }
   }
-
-  return { success: true }
 }
 
 /**

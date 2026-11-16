@@ -83,17 +83,20 @@ export function calculateOvertimeHours(startTimeStr, endTimeStr, isSunday = fals
 
 /**
  * Tạo chuỗi thời gian kết thúc mặc định dựa trên giờ bắt đầu và số giờ
- * Ví dụ: 16:30 + 2h = '18:30'
+ * Ví dụ:
+ * - 16:30 + 2h = '18:30'
+ * - Ca Chủ Nhật sáng 07:30 + 8h làm việc (+ 1h nghỉ trưa 11:30 - 12:30) = '16:30'
+ * - Ca Chủ Nhật sáng 07:30 + 4h làm việc = '11:30'
  */
 export function calculateEndTimeFromHours(startTimeStr, hours, isSunday = false) {
   if (!startTimeStr || !hours) return ''
   const [startH, startM] = String(startTimeStr).replace('h', ':').split(':').map(Number)
-  let totalMinutes = (isNaN(startH) ? 0 : startH) * 60 + (isNaN(startM) ? 0 : startM) + hours * 60
+  let totalMinutes = (isNaN(startH) ? 0 : startH) * 60 + (isNaN(startM) ? 0 : startM) + Number(hours) * 60
 
-  // Nếu là ca ngày Chủ nhật làm qua trưa (bắt đầu buổi sáng trước 12h và trên 4 tiếng)
+  // Nếu ca bắt đầu buổi sáng (trước 12:00) và làm việc nhiều hơn 4 tiếng -> ca đã kéo dài qua giờ nghỉ trưa (11:30 - 12:30)
   const isMorningShift = (isNaN(startH) ? 0 : startH) < 12
-  if (isSunday && isMorningShift && hours >= 4) {
-    totalMinutes += 60 // Bù lại 1h nghỉ trưa 11h30 - 12h30
+  if (isMorningShift && Number(hours) > 4) {
+    totalMinutes += 60 // Bù lại 1h nghỉ trưa 11:30 - 12:30 để ra đúng giờ tan ca chiều (16:30)
   }
 
   const endH = Math.floor(totalMinutes / 60) % 24
@@ -175,17 +178,17 @@ export async function getEmployeeOvertimeEntries(periodId, employeeId, periodMon
     const detail = savedDetails[specificKey] || savedDetails[genericKey]
 
     // Giờ bắt đầu mặc định:
-    // - Ca work ngày CN: 07:30 (ca ban ngày)
+    // - Ca ban ngày Chủ Nhật (hàng work hoặc ca >= 7h): 07:30
     // - Ca overtime (ngày thường hoặc ngày CN sau 16:30): 16:30
     let defaultStartTime = '16:30'
-    if (isSunday && entry.row_type === 'work') {
+    if (isSunday && (entry.row_type === 'work' || Number(entry.value_hours) >= 7)) {
       defaultStartTime = '07:30'
     }
     const startTime = detail?.startTime || defaultStartTime
     
-    const isDayShift = isSunday && entry.row_type === 'work'
-    const roundedEndTime = calculateEndTimeFromHours(startTime, Number(entry.value_hours), isDayShift)
-    const endTime = roundedEndTime || detail?.endTime || ''
+    // Ưu tiên endTime mà người dùng đã chỉ định trong detail trước, nếu chưa có mới tính toán tự động
+    const roundedEndTime = calculateEndTimeFromHours(startTime, Number(entry.value_hours), isSunday)
+    const endTime = detail?.endTime || roundedEndTime || ''
     
     // Nếu chưa có lý do hoặc dữ liệu cũ của CTP đang mang lý do của TK thì tự chuyển sang CTP
     let reason = detail?.reason
@@ -250,19 +253,14 @@ export async function saveOvertimeEntry({
   }
 
   // Xác định dòng lưu dữ liệu:
-  // - Nếu có rowType tường minh thì dùng rowType đó
-  // - Ngày thường: luôn là 'overtime' (加班)
-  // - Ngày Chủ Nhật:
-  //   + Nếu bắt đầu từ 16:30 trở đi (hoặc ca tăng ca chiều tối): lưu vào 'overtime' (加班)
-  //   + Nếu là ca ban ngày 07:30 - 16:30: lưu vào 'work' (上班)
+  // - Ca ban ngày Chủ Nhật (bắt đầu 07:xx sáng và <= 8h): lưu vào 'work' (hàng 上班 trên bảng chấm công)
+  // - Ca tăng ca (sau 16:30 hoặc ngày thường): lưu vào 'overtime' (hàng 加班)
   let targetRowType = rowType
-  if (!targetRowType) {
-    if (!isSun) {
-      targetRowType = 'overtime'
-    } else {
-      const isDayShift = startTime && (startTime.startsWith('07:') || startTime.startsWith('7:')) && hoursNum <= 8
-      targetRowType = isDayShift ? 'work' : 'overtime'
-    }
+  const isMorningSundayShift = isSun && startTime && (startTime.startsWith('07:') || startTime.startsWith('7:')) && hoursNum <= 8
+  if (isMorningSundayShift) {
+    targetRowType = 'work'
+  } else if (!targetRowType) {
+    targetRowType = !isSun ? 'overtime' : 'overtime'
   }
 
   // 1. Kiểm tra xem ô ngày này trong timesheet_entries đã có chưa
@@ -299,6 +297,17 @@ export async function saveOvertimeEntry({
       })
 
     if (insertErr) throw insertErr
+  }
+
+  // Nếu chuyển thành ca ngày Chủ Nhật ('work'), reset dòng 'overtime' cũ về 0 để không bị nhân đôi
+  if (targetRowType === 'work' && isSun) {
+    await supabaseAdmin
+      .from('timesheet_entries')
+      .update({ value_hours: 0, updated_at: new Date().toISOString() })
+      .eq('period_id', periodId)
+      .eq('employee_id', employeeId)
+      .eq('row_type', 'overtime')
+      .eq('day', dayNum)
   }
 
   // 2. Lưu chi tiết giờ vào / giờ ra / lý do vào localStorage

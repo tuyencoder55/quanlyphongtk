@@ -125,15 +125,12 @@ export default function OvertimeModal({
       return
     }
 
-    // Luôn làm tròn giờ kết thúc theo số giờ đã tính để không bị phút lẻ
-    const roundedEndTime = calculateEndTimeFromHours(finalStart, computedHours, isSunday) || finalEnd
+    // Ưu tiên giờ kết thúc do người dùng đã nhập/chọn trên modal (finalEnd), nếu chưa có mới tính tự động
+    const roundedEndTime = finalEnd || calculateEndTimeFromHours(finalStart, computedHours, isSunday)
 
-    // Xác định rowType: ca tăng ca (sau 16:30) lưu vào overtime, ca ban ngày 07:30-16:30 lưu vào work
-    const targetRowType = initialData?.rowType || (
-      isSunday && (finalStart.startsWith('07:') || finalStart.startsWith('7:')) && computedHours <= 8 
-        ? 'work' 
-        : 'overtime'
-    )
+    // Xác định rowType: ca ban ngày Chủ Nhật (bắt đầu 07:xx sáng và <= 8h) lưu vào work (hàng 上班), ca tăng ca lưu vào overtime
+    const isMorningSundayShift = isSunday && (finalStart.startsWith('07:') || finalStart.startsWith('7:')) && computedHours <= 8
+    const targetRowType = isMorningSundayShift ? 'work' : 'overtime'
 
     onSave({
       periodId: period.id,
