@@ -3,8 +3,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import {
   getMealReport,
   saveMealReport,
-  exportMealReportExcel,
-  syncAllLocalMealReportsToCloud
+  exportMealReportExcel
 } from '@/features/meal-report/mealService'
 import MealReportSheet from '@/features/meal-report/MealReportSheet'
 import {
@@ -66,27 +65,68 @@ export default function MealReportPage() {
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
   const [isCloudSynced, setIsCloudSynced] = useState(true) // Trạng thái kết nối Supabase Cloud
-  const isDirtyRef = useRef(false) // Chỉ lưu khi người dùng THỰC SỰ gõ/sửa ô
 
-  // 0. Tự động quét và đẩy toàn bộ dữ liệu localStorage cũ của máy này lên Supabase Cloud
-  useEffect(() => {
-    syncAllLocalMealReportsToCloud()
-  }, [])
+  // Lưu vết các ngày người dùng THỰC SỰ vừa gõ/sửa để chỉ lưu đúng những ngày đó lên Cloud
+  const dirtyDaysRef = useRef(new Set())
+  const loadedPeriodRef = useRef({ month: null, year: null })
+  const entriesRef = useRef([])
+  const saveTimerRef = useRef(null)
 
-  // 1. Tải dữ liệu biểu báo cơm theo tháng/năm đang chọn
+  // Hàm lưu các ngày vừa sửa lên Supabase Cloud (không bao giờ ghi đè số 0 lên ngày khác)
+  const flushSave = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+
+    if (!canEdit || dirtyDaysRef.current.size === 0) return
+
+    const { month, year } = loadedPeriodRef.current
+    if (!month || !year) return
+
+    const daysToSave = new Set(dirtyDaysRef.current)
+    dirtyDaysRef.current.clear()
+
+    const changedRows = entriesRef.current.filter((row) => daysToSave.has(row.day))
+    if (changedRows.length === 0) return
+
+    setSaveStatus('saving')
+    try {
+      const res = await saveMealReport(month, year, changedRows, department)
+      setSaveStatus('saved')
+      if (res?.isLocalOnly) {
+        setIsCloudSynced(false)
+        if (res.error) {
+          toast.error('Không thể lưu lên Cloud: ' + res.error)
+        }
+      } else {
+        setIsCloudSynced(true)
+      }
+    } catch (err) {
+      console.warn('Lỗi lưu biểu báo cơm:', err)
+      setSaveStatus('saved')
+      toast.error('Lỗi lưu biểu báo cơm: ' + err.message)
+    }
+  }, [canEdit, department])
+
+  // 1. Tải dữ liệu biểu báo cơm theo tháng/năm đang chọn trực tiếp từ Supabase Cloud
   useEffect(() => {
     let isCancelled = false
     setLoading(true)
-    isDirtyRef.current = false // Reset cờ sửa để không tự động lưu đè khi vừa tải
 
     async function loadData() {
+      // Nếu kỳ trước đó còn ô chưa kịp lưu -> lưu nốt cho kỳ cũ trước khi chuyển tháng
+      await flushSave()
+
       try {
         const data = await getMealReport(selectedMonth, selectedYear, department)
         if (!isCancelled) {
           setEntries(data)
+          entriesRef.current = data
+          loadedPeriodRef.current = { month: selectedMonth, year: selectedYear }
+          dirtyDaysRef.current.clear()
           setIsCloudSynced(Boolean(data.isDbConnected))
           setSaveStatus('saved')
-          isDirtyRef.current = false
         }
       } catch (err) {
         if (!isCancelled) {
@@ -104,58 +144,48 @@ export default function MealReportPage() {
     return () => {
       isCancelled = true
     }
-  }, [selectedMonth, selectedYear, department])
+  }, [selectedMonth, selectedYear, department, flushSave])
 
-  // 2. Tự Động Lưu (Auto-Save) CHỈ KHI người dùng có chỉnh sửa thực tế
+  // Lưu nốt dữ liệu nếu người dùng rời trang trước khi hết 400ms chờ
   useEffect(() => {
-    // Không lưu nếu: chưa ai sửa ô, không có quyền sửa, hoặc danh sách rỗng
-    if (!isDirtyRef.current || !canEdit || entries.length === 0) return
+    return () => {
+      flushSave()
+    }
+  }, [flushSave])
 
-    const targetMonth = selectedMonth
-    const targetYear = selectedYear
-
-    setSaveStatus('saving')
-    const timer = setTimeout(async () => {
-      try {
-        const res = await saveMealReport(targetMonth, targetYear, entries, department)
-        setSaveStatus('saved')
-        isDirtyRef.current = false
-        if (res?.isLocalOnly) {
-          setIsCloudSynced(false)
-        } else {
-          setIsCloudSynced(true)
-        }
-      } catch (err) {
-        console.warn('Lỗi tự động lưu biểu báo cơm:', err)
-        setSaveStatus('saved')
-      }
-    }, 600)
-
-    return () => clearTimeout(timer)
-  }, [entries, canEdit, department, selectedMonth, selectedYear])
-
-  // 3. Xử lý khi Admin nhập ô
+  // 2. Xử lý khi Admin nhập ô
   const handleChangeEntry = (day, field, value) => {
+    if (!canEdit) return
     const numVal = Math.max(0, parseInt(value, 10) || 0)
-    isDirtyRef.current = true // Đánh dấu người dùng ĐÃ SỬA Ô THỰC TẾ
 
-    setEntries((prev) =>
-      prev.map((row) => {
-        if (row.day !== day) return row
+    const nextEntries = entriesRef.current.map((row) => {
+      if (row.day !== day) return row
 
-        const updated = { ...row, [field]: numVal }
+      const updated = { ...row, [field]: numVal }
 
-        // Logic tự động tính thông minh:
-        // Nếu sửa Tổng số người hoặc Vắng -> Tự cập nhật lại Trưa = max(0, Tổng - Vắng)
-        if (field === 'total_people' || field === 'absent_count') {
-          const total = field === 'total_people' ? numVal : (row.total_people || 0)
-          const absent = field === 'absent_count' ? numVal : (row.absent_count || 0)
-          updated.lunch_count = Math.max(0, total - absent)
-        }
+      // Logic tự động tính thông minh:
+      // Nếu sửa Tổng số người hoặc Vắng -> Tự cập nhật lại Trưa = max(0, Tổng - Vắng)
+      if (field === 'total_people' || field === 'absent_count') {
+        const total = field === 'total_people' ? numVal : (row.total_people || 0)
+        const absent = field === 'absent_count' ? numVal : (row.absent_count || 0)
+        updated.lunch_count = Math.max(0, total - absent)
+      }
 
-        return updated
-      })
-    )
+      return updated
+    })
+
+    entriesRef.current = nextEntries
+    setEntries(nextEntries)
+
+    // Đánh dấu đúng ngày này vừa được sửa và hẹn lưu sau 400ms
+    dirtyDaysRef.current.add(day)
+    setSaveStatus('saving')
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+    saveTimerRef.current = setTimeout(() => {
+      flushSave()
+    }, 400)
   }
 
   // 4. Xuất file Excel
